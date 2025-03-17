@@ -61,7 +61,7 @@ async function main() {
     console.error('Usage: npx inflatejs <input-file> [output-file] [options]');
     console.error('Options:');
     console.error('  --no-rename    Disable variable renaming');
-    console.error('  --infer-types  Enable type inference');
+    console.error('  --infer-types  Enable type inference (Always enabled for TypeScript output)');
     console.error('  --typescript   Output TypeScript code (.ts extension)');
     process.exit(1);
   }
