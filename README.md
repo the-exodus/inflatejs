@@ -20,7 +20,7 @@ A TypeScript application that takes minified JavaScript and "unminifies" it, mak
 
 1. Clone this repository:
    ```
-   git clone https://github.com/yourusername/inflatejs.git
+   git clone https://github.com/the-exodus/inflatejs.git
    cd inflatejs
    ```
 
