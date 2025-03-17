@@ -58,13 +58,10 @@ export async function unminify(code: string, options: UnminifyOptions = {}): Pro
 
   // Function to generate a unique name for a variable
   const generateName = (originalName: string, nameCounter: Record<string, number>, suggestedNames: Record<string, string[]>): string => {
-    // Find a suitable replacement name
     const baseIndex = suggestedNames.params.indexOf(originalName);
     const baseName = baseIndex >= 0 && baseIndex < suggestedNames.replacements.length 
       ? suggestedNames.replacements[baseIndex] 
       : 'var';
-    
-    // Ensure unique names with counters
     nameCounter[baseName] = (nameCounter[baseName] || 0) + 1;
     return nameCounter[baseName] > 1 
       ? `${baseName}${nameCounter[baseName]}` 
@@ -73,18 +70,12 @@ export async function unminify(code: string, options: UnminifyOptions = {}): Pro
 
   // Function to handle renaming of variables
   const handleVariableRenaming = (path: NodePath<t.Identifier>, scopeNameMaps: Map<string, Record<string, string>>, nameCounter: Record<string, number>, suggestedNames: Record<string, string[]>) => {
-    // Skip property names
     if (path.parentPath.isObjectProperty() && path.parentKey === 'key') {
       return;
     }
-    
     const originalName = path.node.name;
-    
-    // Only process minified-looking variables
     if (/^[a-z]$|^[a-z][0-9]+$/.test(originalName)) {
       const binding = path.scope.getBinding(originalName);
-      
-      // Find the correct scope for this identifier
       if (binding) {
         const scopeId = binding.scope.uid.toString();
         if (scopeNameMaps.has(scopeId)) {
@@ -377,15 +368,10 @@ const addTypeAnnotationsToVariables = (path: NodePath<t.VariableDeclarator>, inf
     const varName = path.node.id.name;
     if (inferredTypes.has(varName)) {
       const inferredType = inferredTypes.get(varName)!;
-      
-      // Only add annotations for types with reasonable confidence
       if (inferredType.confidence >= 0.7 && inferredType.typeName !== 'any') {
-        // Create the variable parent path's type annotation
         const parentPath = path.parentPath;
         if (parentPath.isVariableDeclarator() && parentPath.parentPath.isVariableDeclaration()) {
           const declaration = parentPath.parentPath.node;
-          
-          // Convert to TS node by adding type annotation comment
           declaration.leadingComments = declaration.leadingComments || [];
           declaration.leadingComments.push({
             type: 'CommentLine',
@@ -399,7 +385,6 @@ const addTypeAnnotationsToVariables = (path: NodePath<t.VariableDeclarator>, inf
 
 // Function to add type annotations to function parameters
 const addTypeAnnotationsToParameters = (path: NodePath<t.Function>, inferredTypes: TypeMap) => {
-  // Add comments for function return type - only works for function declarations with names
   if (path.isFunctionDeclaration() && path.node.id) {
     const funcName = path.node.id.name;
     if (inferredTypes.has(funcName)) {
@@ -415,17 +400,12 @@ const addTypeAnnotationsToParameters = (path: NodePath<t.Function>, inferredType
       }
     }
   }
-  
-  // Add type annotations to parameters
   path.node.params.forEach(param => {
     if (t.isIdentifier(param)) {
       const paramName = param.name;
       if (inferredTypes.has(paramName)) {
         const inferredType = inferredTypes.get(paramName)!;
-        
-        // Only add annotations for types with reasonable confidence
         if (inferredType.confidence >= 0.7 && inferredType.typeName !== 'any') {
-          // Add parameter type as a trailing comment
           param.trailingComments = param.trailingComments || [];
           param.trailingComments.push({
             type: 'CommentLine',

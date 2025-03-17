@@ -36,72 +36,67 @@ export class TypeInferer implements ITypeInferer {
    */
   private collectDeclarations(ast: t.File): void {
     traverse(ast, {
-      // Variable declarations
-      VariableDeclarator: (path: NodePath<t.VariableDeclarator>) => {
-        if (t.isIdentifier(path.node.id)) {
-          const varName = path.node.id.name;
-          
-          // Initialize as unknown type
-          this.typeMap.set(varName, { typeName: 'any', confidence: 0 });
-          
-          // If there's an initializer, try to infer type from it
-          if (path.node.init) {
-            const inferredType = this.inferTypeFromNode(path.node.init);
-            if (inferredType) {
-              this.typeMap.set(varName, inferredType);
-            }
-          }
+      VariableDeclarator: this.handleVariableDeclarator.bind(this),
+      FunctionDeclaration: this.handleFunctionDeclaration.bind(this),
+      FunctionExpression: this.handleFunctionExpression.bind(this),
+      ArrowFunctionExpression: this.handleArrowFunctionExpression.bind(this)
+    });
+  }
+
+  /**
+   * Function to handle variable declarators
+   */
+  private handleVariableDeclarator(path: NodePath<t.VariableDeclarator>): void {
+    if (t.isIdentifier(path.node.id)) {
+      const varName = path.node.id.name;
+      this.typeMap.set(varName, { typeName: 'any', confidence: 0 });
+      if (path.node.init) {
+        const inferredType = this.inferTypeFromNode(path.node.init);
+        if (inferredType) {
+          this.typeMap.set(varName, inferredType);
         }
-      },
-      
-      // Function declarations
-      FunctionDeclaration: (path: NodePath<t.FunctionDeclaration>) => {
-        if (path.node.id) {
-          const funcName = path.node.id.name;
-          // Set function type with parameter and return type placeholders
-          this.typeMap.set(funcName, { 
-            typeName: '(...args: any[]) => any', 
-            confidence: 0.7 
-          });
-          
-          // For each parameter, set an initial type of 'any'
-          path.node.params.forEach(param => {
-            if (t.isIdentifier(param)) {
-              this.typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-            }
-          });
+      }
+    }
+  }
 
-          // Try to infer function return type
-          this.inferFunctionReturnType(path);
+  /**
+   * Function to handle function declarations
+   */
+  private handleFunctionDeclaration(path: NodePath<t.FunctionDeclaration>): void {
+    if (path.node.id) {
+      const funcName = path.node.id.name;
+      this.typeMap.set(funcName, { typeName: '(...args: any[]) => any', confidence: 0.7 });
+      path.node.params.forEach(param => {
+        if (t.isIdentifier(param)) {
+          this.typeMap.set(param.name, { typeName: 'any', confidence: 0 });
         }
-      },
-      
-      // Function expressions
-      FunctionExpression: (path: NodePath<t.FunctionExpression>) => {
-        // For each parameter, set an initial type of 'any'
-        path.node.params.forEach(param => {
-          if (t.isIdentifier(param)) {
-            this.typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-          }
-        });
+      });
+      this.inferFunctionReturnType(path);
+    }
+  }
 
-        // Try to infer function return type
-        this.inferFunctionReturnType(path);
-      },
-      
-      // Arrow function expressions
-      ArrowFunctionExpression: (path: NodePath<t.ArrowFunctionExpression>) => {
-        // For each parameter, set an initial type of 'any'
-        path.node.params.forEach(param => {
-          if (t.isIdentifier(param)) {
-            this.typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-          }
-        });
-
-        // Try to infer function return type
-        this.inferFunctionReturnType(path);
+  /**
+   * Function to handle function expressions
+   */
+  private handleFunctionExpression(path: NodePath<t.FunctionExpression>): void {
+    path.node.params.forEach(param => {
+      if (t.isIdentifier(param)) {
+        this.typeMap.set(param.name, { typeName: 'any', confidence: 0 });
       }
     });
+    this.inferFunctionReturnType(path);
+  }
+
+  /**
+   * Function to handle arrow function expressions
+   */
+  private handleArrowFunctionExpression(path: NodePath<t.ArrowFunctionExpression>): void {
+    path.node.params.forEach(param => {
+      if (t.isIdentifier(param)) {
+        this.typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+      }
+    });
+    this.inferFunctionReturnType(path);
   }
 
   /**
@@ -109,117 +104,91 @@ export class TypeInferer implements ITypeInferer {
    */
   private analyzeUsages(ast: t.File): void {
     traverse(ast, {
-      // Variable references
-      Identifier: (path: NodePath<t.Identifier>) => {
-        const name = path.node.name;
-        
-        // Skip if this isn't a reference or if we don't have this variable in our map
-        if (path.isReferencedIdentifier() && this.typeMap.has(name)) {
-          // Check parent to analyze usage
-          const parent = path.parent;
+      Identifier: this.handleIdentifier.bind(this),
+      CallExpression: this.handleCallExpression.bind(this)
+    });
+  }
 
-          // Check binary operations for number inference
-          if (t.isBinaryExpression(parent) && 
-              (['+', '-', '*', '/', '%', '**'].includes(parent.operator))) {
-            if (!this.usageMap.has(name)) {
-              this.usageMap.set(name, new Set());
-            }
-            
-            // If it's a mathematical operation, likely a number
-            if (['-', '*', '/', '%', '**'].includes(parent.operator)) {
-              this.usageMap.get(name)!.add('number');
-            } 
-            // Addition could be number or string
-            else if (parent.operator === '+') {
-              this.usageMap.get(name)!.add('number|string');
-            }
-          }
-          
-          // Check for array access
-          if (t.isMemberExpression(parent) && parent.object === path.node && t.isNumericLiteral(parent.property)) {
-            if (!this.usageMap.has(name)) {
-              this.usageMap.set(name, new Set());
-            }
-            this.usageMap.get(name)!.add('array');
-          }
-          
-          // Check for method calls that can indicate types
-          if (t.isMemberExpression(parent) && t.isIdentifier(parent.property)) {
-            const methodName = parent.property.name;
-            
-            // String methods
-            const stringMethods = ['charAt', 'charCodeAt', 'concat', 'indexOf', 'lastIndexOf', 
-              'match', 'replace', 'search', 'slice', 'split', 'substr', 'substring', 
-              'toLowerCase', 'toUpperCase', 'trim'];
-              
-            // Array methods  
-            const arrayMethods = ['concat', 'every', 'filter', 'find', 'findIndex', 'forEach', 'includes', 
-              'indexOf', 'join', 'keys', 'map', 'pop', 'push', 'reduce', 'reverse', 'shift', 
-              'slice', 'some', 'sort', 'splice', 'unshift'];
-            
-            if (stringMethods.includes(methodName)) {
-              if (!this.usageMap.has(name)) {
-                this.usageMap.set(name, new Set());
-              }
-              this.usageMap.get(name)!.add('string');
-            } else if (arrayMethods.includes(methodName)) {
-              if (!this.usageMap.has(name)) {
-                this.usageMap.set(name, new Set());
-              }
-              this.usageMap.get(name)!.add('array');
-            }
-          }
-          
-          // Check for comparison with literals
-          if (t.isBinaryExpression(parent) && 
-              ['==', '===', '!=', '!==', '>', '<', '>=', '<='].includes(parent.operator)) {
-            const otherSide = parent.left === path.node ? parent.right : parent.left;
-            
-            if (t.isStringLiteral(otherSide)) {
-              if (!this.usageMap.has(name)) {
-                this.usageMap.set(name, new Set());
-              }
-              this.usageMap.get(name)!.add('string');
-            } else if (t.isNumericLiteral(otherSide)) {
-              if (!this.usageMap.has(name)) {
-                this.usageMap.set(name, new Set());
-              }
-              this.usageMap.get(name)!.add('number');
-            } else if (t.isBooleanLiteral(otherSide)) {
-              if (!this.usageMap.has(name)) {
-                this.usageMap.set(name, new Set());
-              }
-              this.usageMap.get(name)!.add('boolean');
-            }
-          }
-        }
-      },
-      
-      // Check function calls to infer parameter types
-      CallExpression: (path: NodePath<t.CallExpression>) => {
-        const callee = path.node.callee;
-        
-        // Handle direct function identifier calls
-        if (t.isIdentifier(callee) && this.typeMap.has(callee.name)) {
-          // Get arguments and infer parameter types
-          path.node.arguments.forEach((arg, index) => {
-            if (t.isIdentifier(arg)) {
-              const paramType = this.inferTypeFromNode(arg);
-              
-              if (paramType && paramType.confidence > 0.5) {
-                // Mark this variable as likely being of this type
-                if (this.typeMap.has(arg.name)) {
-                  const currentType = this.typeMap.get(arg.name)!;
-                  if (paramType.confidence > currentType.confidence) {
-                    this.typeMap.set(arg.name, paramType);
-                  }
-                }
-              }
-            }
-          });
+  /**
+   * Function to handle identifier nodes
+   */
+  private handleIdentifier(path: NodePath<t.Identifier>): void {
+    const name = path.node.name;
+    if (path.isReferencedIdentifier() && this.typeMap.has(name)) {
+      const parent = path.parent;
+      if (t.isBinaryExpression(parent) && ['+', '-', '*', '/', '%', '**'].includes(parent.operator)) {
+        this.addUsage(name, parent.operator === '+' ? 'number|string' : 'number');
+      }
+      if (t.isMemberExpression(parent) && parent.object === path.node && t.isNumericLiteral(parent.property)) {
+        this.addUsage(name, 'array');
+      }
+      if (t.isMemberExpression(parent) && t.isIdentifier(parent.property)) {
+        const methodName = parent.property.name;
+        if (this.isStringMethod(methodName)) {
+          this.addUsage(name, 'string');
+        } else if (this.isArrayMethod(methodName)) {
+          this.addUsage(name, 'array');
         }
       }
-    });
+      if (t.isBinaryExpression(parent) && ['==', '===', '!=', '!==', '>', '<', '>=', '<='].includes(parent.operator)) {
+        const otherSide = parent.left === path.node ? parent.right : parent.left;
+        if (t.isStringLiteral(otherSide)) {
+          this.addUsage(name, 'string');
+        } else if (t.isNumericLiteral(otherSide)) {
+          this.addUsage(name, 'number');
+        } else if (t.isBooleanLiteral(otherSide)) {
+          this.addUsage(name, 'boolean');
+        }
+      }
+    }
+  }
+
+  /**
+   * Function to handle call expressions
+   */
+  private handleCallExpression(path: NodePath<t.CallExpression>): void {
+    const callee = path.node.callee;
+    if (t.isIdentifier(callee) && this.typeMap.has(callee.name)) {
+      path.node.arguments.forEach((arg, index) => {
+        if (t.isIdentifier(arg)) {
+          const paramType = this.inferTypeFromNode(arg);
+          if (paramType && paramType.confidence > 0.5) {
+            if (this.typeMap.has(arg.name)) {
+              const currentType = this.typeMap.get(arg.name)!;
+              if (paramType.confidence > currentType.confidence) {
+                this.typeMap.set(arg.name, paramType);
+              }
+            }
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * Function to add usage information
+   */
+  private addUsage(name: string, usage: string): void {
+    if (!this.usageMap.has(name)) {
+      this.usageMap.set(name, new Set());
+    }
+    this.usageMap.get(name)!.add(usage);
+  }
+
+  /**
+   * Function to check if a method is a string method
+   */
+  private isStringMethod(methodName: string): boolean {
+    const stringMethods = ['charAt', 'charCodeAt', 'concat', 'indexOf', 'lastIndexOf', 'match', 'replace', 'search', 'slice', 'split', 'substr', 'substring', 'toLowerCase', 'toUpperCase', 'trim'];
+    return stringMethods.includes(methodName);
+  }
+
+  /**
+   * Function to check if a method is an array method
+   */
+  private isArrayMethod(methodName: string): boolean {
+    const arrayMethods = ['concat', 'every', 'filter', 'find', 'findIndex', 'forEach', 'includes', 'indexOf', 'join', 'keys', 'map', 'pop', 'push', 'reduce', 'reverse', 'shift', 'slice', 'some', 'sort', 'splice', 'unshift'];
+    return arrayMethods.includes(methodName);
   }
 
   /**
