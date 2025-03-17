@@ -1,0 +1,1 @@
+!function(){var a=10,b="hello",c=!0,d=[1,2,3,4],e={x:1,y:2},f=function(g,h){return g>h?g+1:h+2},i=function(j){return j.map(function(k){return k*2})},l=function(m){return m.toLowerCase()};console.log(l(b),i(d),f(a,5),c&&e.x===1)}

@@ -1,0 +1,30 @@
+// Map containing known types for standard JS objects and methods
+export const knownTypes: Map<string, string> = new Map([
+  // Common JavaScript types
+  ['String', 'string'],
+  ['Number', 'number'],
+  ['Boolean', 'boolean'],
+  ['Array', 'any[]'],
+  ['Object', 'object'],
+  ['Function', 'Function'],
+  ['RegExp', 'RegExp'],
+  ['Date', 'Date'],
+  ['Promise', 'Promise<any>'],
+  ['Map', 'Map<any, any>'],
+  ['Set', 'Set<any>'],
+  // Common object methods and their return types
+  ['Array.prototype.map', 'any[]'],
+  ['Array.prototype.filter', 'any[]'],
+  ['Array.prototype.reduce', 'any'],
+  ['Array.prototype.forEach', 'void'],
+  ['Array.prototype.find', 'any'],
+  ['Array.prototype.some', 'boolean'],
+  ['Array.prototype.every', 'boolean'],
+  ['Array.prototype.join', 'string'],
+  ['String.prototype.split', 'string[]'],
+  ['String.prototype.replace', 'string'],
+  ['String.prototype.match', 'RegExpMatchArray | null'],
+  ['Object.keys', 'string[]'],
+  ['Object.values', 'any[]'],
+  ['Object.entries', '[string, any][]'],
+]);
