@@ -1,0 +1,463 @@
+/**
+ * TypeResolver implementation
+ * Single Responsibility: Resolving final types from all collected information
+ */
+
+import * as t from '@babel/types';
+import traverse from '@babel/traverse';
+import { ITypeResolver, CallGraphResult } from '../../interfaces';
+import { TypeMap, InferredType, TypeInferenceConfig } from '../../types';
+import { knownTypes } from '../../known-types';
+
+export class TypeResolver implements ITypeResolver {
+  private config: TypeInferenceConfig = { maxDepth: 8, maxTime: 5000 };
+  private startTime: number = 0;
+  private currentAst: t.File | null = null;
+
+  constructor(config?: Partial<TypeInferenceConfig>) {
+    if (config) {
+      this.config = { ...this.config, ...config };
+    }
+  }
+
+  /**
+   * Resolve types using all collected information
+   */
+  public resolveTypes(
+    typeMap: TypeMap,
+    usageMap: Map<string, Set<string>>,
+    callGraph: CallGraphResult
+  ): TypeMap {
+    this.startTime = Date.now();
+
+    // Perform iterative type propagation
+    const maxIterations = 3;
+    for (let i = 0; i < maxIterations; i++) {
+      const snapshot = new Map(typeMap);
+
+      // Infer types from call graph
+      this.inferTypesFromCallGraph(typeMap, callGraph);
+
+      // Resolve types from usage patterns
+      this.resolveFromUsagePatterns(typeMap, usageMap);
+
+      // Check convergence
+      if (this.typeMapsEqual(snapshot, typeMap)) {
+        break;
+      }
+    }
+
+    return typeMap;
+  }
+
+  /**
+   * Set the current AST for variable type updates
+   */
+  public setCurrentAst(ast: t.File): void {
+    this.currentAst = ast;
+  }
+
+  /**
+   * Infer types from call graph information
+   */
+  private inferTypesFromCallGraph(typeMap: TypeMap, callGraph: CallGraphResult): void {
+    // Update parameter types from call sites
+    for (const callSite of callGraph.callSites) {
+      const funcInfo = callGraph.functions.get(callSite.callee);
+      if (!funcInfo) continue;
+
+      // Re-infer argument types based on current typeMap
+      const currentArgTypes = callSite.path.node.arguments.map(arg => {
+        if (t.isNode(arg) && !t.isSpreadElement(arg)) {
+          return this.inferTypeFromNode(arg, typeMap, 0);
+        }
+        return null;
+      });
+
+      // Update parameter types
+      currentArgTypes.forEach((argType, index) => {
+        if (argType && index < funcInfo.params.length) {
+          const paramName = funcInfo.params[index];
+          const currentType = typeMap.get(paramName);
+
+          if (!currentType || argType.confidence > currentType.confidence) {
+            typeMap.set(paramName, argType);
+          }
+        }
+      });
+    }
+
+    // Infer return types recursively
+    const visited = new Set<string>();
+    for (const [, funcInfo] of callGraph.functions.entries()) {
+      this.inferFunctionReturnType(funcInfo, typeMap, callGraph, 0, visited);
+    }
+
+    // Update variable types from function calls
+    this.updateVariableTypesFromCalls(typeMap, callGraph);
+  }
+
+  /**
+   * Recursively infer function return type
+   */
+  private inferFunctionReturnType(
+    funcInfo: any,
+    typeMap: TypeMap,
+    callGraph: CallGraphResult,
+    depth: number,
+    visited: Set<string>
+  ): InferredType | null {
+    // Check limits
+    if (depth > this.config.maxDepth) return null;
+    if (this.config.maxTime && Date.now() - this.startTime > this.config.maxTime) return null;
+    if (visited.has(funcInfo.name)) return null;
+    if (funcInfo.returnType) return funcInfo.returnType;
+
+    visited.add(funcInfo.name);
+
+    let returnType: InferredType = { typeName: 'void', confidence: 0.5 };
+    let hasExplicitReturn = false;
+
+    // Traverse return statements
+    funcInfo.path.traverse({
+      ReturnStatement: (returnPath: any) => {
+        hasExplicitReturn = true;
+        if (returnPath.node.argument) {
+          const argType = this.inferTypeFromNodeRecursive(
+            returnPath.node.argument,
+            typeMap,
+            callGraph,
+            depth + 1,
+            new Set(visited)
+          );
+
+          if (argType && argType.confidence > returnType.confidence) {
+            returnType = argType;
+          }
+        }
+      }
+    });
+
+    funcInfo.returnType = returnType;
+
+    // Update function type in typeMap
+    if (typeMap.has(funcInfo.name)) {
+      const paramTypes = funcInfo.params.map((p: string) => {
+        const type = typeMap.get(p);
+        return type ? type.typeName : 'any';
+      });
+
+      const typeStr = hasExplicitReturn
+        ? `(${paramTypes.join(', ')}) => ${returnType.typeName}`
+        : `(${paramTypes.join(', ')}) => void`;
+
+      typeMap.set(funcInfo.name, {
+        typeName: typeStr,
+        confidence: Math.max(0.6, returnType.confidence)
+      });
+    }
+
+    visited.delete(funcInfo.name);
+    return returnType;
+  }
+
+  /**
+   * Infer type from node recursively through call graph
+   */
+  private inferTypeFromNodeRecursive(
+    node: t.Node,
+    typeMap: TypeMap,
+    callGraph: CallGraphResult,
+    depth: number,
+    visited: Set<string>
+  ): InferredType | null {
+    if (depth > this.config.maxDepth) {
+      return this.inferTypeFromNode(node, typeMap, depth);
+    }
+
+    if (this.config.maxTime && Date.now() - this.startTime > this.config.maxTime) {
+      return this.inferTypeFromNode(node, typeMap, depth);
+    }
+
+    // Handle call expressions
+    if (t.isCallExpression(node)) {
+      // Method calls
+      if (t.isMemberExpression(node.callee) && t.isIdentifier(node.callee.property)) {
+        const methodName = node.callee.property.name;
+        if (t.isIdentifier(node.callee.object)) {
+          const objType = typeMap.get(node.callee.object.name);
+          if (objType) {
+            return this.inferMethodReturnType(objType.typeName, methodName);
+          }
+        }
+      }
+      // Function calls
+      else if (t.isIdentifier(node.callee)) {
+        const funcName = node.callee.name;
+
+        if (knownTypes.has(funcName)) {
+          return { typeName: knownTypes.get(funcName)!, confidence: 0.8 };
+        }
+
+        const funcInfo = callGraph.functions.get(funcName);
+        if (funcInfo && !visited.has(funcName)) {
+          const returnType = this.inferFunctionReturnType(
+            funcInfo,
+            typeMap,
+            callGraph,
+            depth + 1,
+            visited
+          );
+          if (returnType) return returnType;
+        }
+      }
+    }
+
+    return this.inferTypeFromNode(node, typeMap, depth);
+  }
+
+  /**
+   * Infer method return type based on object type and method name
+   */
+  private inferMethodReturnType(objType: string, methodName: string): InferredType | null {
+    if (objType === 'string') {
+      if (['split'].includes(methodName)) return { typeName: 'string[]', confidence: 0.9 };
+      if (['indexOf', 'lastIndexOf', 'search', 'charCodeAt'].includes(methodName)) {
+        return { typeName: 'number', confidence: 0.9 };
+      }
+      return { typeName: 'string', confidence: 0.9 };
+    }
+
+    if (objType.includes('[]')) {
+      if (['map', 'filter', 'slice', 'concat'].includes(methodName)) {
+        return { typeName: objType, confidence: 0.9 };
+      }
+      if (['join'].includes(methodName)) return { typeName: 'string', confidence: 0.9 };
+      if (['every', 'some', 'includes'].includes(methodName)) {
+        return { typeName: 'boolean', confidence: 0.9 };
+      }
+      if (['indexOf', 'findIndex'].includes(methodName)) {
+        return { typeName: 'number', confidence: 0.9 };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Basic type inference from node
+   */
+  private inferTypeFromNode(node: t.Node, typeMap: TypeMap, depth: number): InferredType | null {
+    switch (node.type) {
+      case 'StringLiteral':
+        return { typeName: 'string', confidence: 1.0 };
+      case 'NumericLiteral':
+        return { typeName: 'number', confidence: 1.0 };
+      case 'BooleanLiteral':
+        return { typeName: 'boolean', confidence: 1.0 };
+      case 'NullLiteral':
+        return { typeName: 'null', confidence: 1.0 };
+      case 'ArrayExpression':
+        return this.inferArrayType(node, typeMap, depth);
+      case 'ObjectExpression':
+        return { typeName: 'object', confidence: 0.8 };
+      case 'FunctionExpression':
+      case 'ArrowFunctionExpression':
+        return { typeName: 'Function', confidence: 0.9 };
+      case 'CallExpression':
+        return this.inferCallType(node, typeMap);
+      case 'Identifier':
+        return typeMap.get(node.name) || { typeName: 'any', confidence: 0.1 };
+      case 'BinaryExpression':
+        return this.inferBinaryExpressionType(node, typeMap, depth);
+      default:
+        return { typeName: 'any', confidence: 0.1 };
+    }
+  }
+
+  /**
+   * Infer array type
+   */
+  private inferArrayType(node: t.ArrayExpression, typeMap: TypeMap, depth: number): InferredType {
+    if (node.elements.length === 0) return { typeName: 'any[]', confidence: 0.7 };
+
+    const firstElement = node.elements[0];
+    if (!firstElement) return { typeName: 'any[]', confidence: 0.7 };
+
+    const firstType = this.inferTypeFromNode(firstElement, typeMap, depth);
+    if (!firstType || firstType.confidence < 0.7) return { typeName: 'any[]', confidence: 0.8 };
+
+    const allSameType = node.elements.every(el => {
+      if (!el) return true;
+      const elType = this.inferTypeFromNode(el, typeMap, depth);
+      return elType && elType.typeName === firstType.typeName;
+    });
+
+    return allSameType
+      ? { typeName: `${firstType.typeName}[]`, confidence: 0.9 }
+      : { typeName: 'any[]', confidence: 0.8 };
+  }
+
+  /**
+   * Infer type from call expression
+   */
+  private inferCallType(node: t.CallExpression, typeMap: TypeMap): InferredType {
+    if (t.isIdentifier(node.callee) && knownTypes.has(node.callee.name)) {
+      return { typeName: knownTypes.get(node.callee.name)!, confidence: 0.8 };
+    }
+    return { typeName: 'any', confidence: 0.3 };
+  }
+
+  /**
+   * Infer type from binary expression
+   */
+  private inferBinaryExpressionType(
+    node: t.BinaryExpression,
+    typeMap: TypeMap,
+    depth: number
+  ): InferredType {
+    if (['+', '-', '*', '/', '%', '**'].includes(node.operator)) {
+      if (node.operator === '+') {
+        const leftType = this.inferTypeFromNode(node.left, typeMap, depth);
+        const rightType = this.inferTypeFromNode(node.right, typeMap, depth);
+        if (leftType?.typeName === 'string' || rightType?.typeName === 'string') {
+          return { typeName: 'string', confidence: 0.8 };
+        }
+        return { typeName: 'number', confidence: 0.7 };
+      }
+      return { typeName: 'number', confidence: 0.9 };
+    }
+
+    if (['==', '===', '!=', '!==', '>', '<', '>=', '<=', '&&', '||'].includes(node.operator)) {
+      return { typeName: 'boolean', confidence: 0.9 };
+    }
+
+    return { typeName: 'any', confidence: 0.3 };
+  }
+
+  /**
+   * Update variable types from function call results
+   */
+  private updateVariableTypesFromCalls(typeMap: TypeMap, callGraph: CallGraphResult): void {
+    if (!this.currentAst) return;
+
+    traverse(this.currentAst, {
+      VariableDeclarator: (path) => {
+        if (!t.isIdentifier(path.node.id) || !t.isCallExpression(path.node.init)) return;
+
+        const varName = path.node.id.name;
+        const callExpr = path.node.init;
+
+        if (t.isIdentifier(callExpr.callee)) {
+          const funcInfo = callGraph.functions.get(callExpr.callee.name);
+          if (funcInfo?.returnType) {
+            const currentType = typeMap.get(varName);
+            if (!currentType || funcInfo.returnType.confidence > currentType.confidence) {
+              typeMap.set(varName, funcInfo.returnType);
+            }
+          }
+        }
+        // Handle IIFEs
+        else if (t.isFunctionExpression(callExpr.callee) || t.isArrowFunctionExpression(callExpr.callee)) {
+          const returnType = this.inferIIFEReturnType(callExpr, typeMap);
+          const currentType = typeMap.get(varName);
+          if (!currentType || returnType.confidence > currentType.confidence) {
+            typeMap.set(varName, returnType);
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * Infer return type from IIFE
+   */
+  private inferIIFEReturnType(callExpr: t.CallExpression, typeMap: TypeMap): InferredType {
+    const funcExpr = callExpr.callee as t.FunctionExpression | t.ArrowFunctionExpression;
+    let returnType: InferredType = { typeName: 'void', confidence: 0.5 };
+
+    // Infer parameter types from arguments
+    const paramTypes = callExpr.arguments.map(arg => {
+      if (t.isNode(arg) && !t.isSpreadElement(arg)) {
+        return this.inferTypeFromNode(arg, typeMap, 0);
+      }
+      return null;
+    });
+
+    // Set parameter types
+    funcExpr.params.forEach((param, index) => {
+      if (t.isIdentifier(param) && paramTypes[index]) {
+        typeMap.set(param.name, paramTypes[index]!);
+      }
+    });
+
+    // Analyze return statements
+    if (t.isArrowFunctionExpression(funcExpr) && funcExpr.expression && funcExpr.body) {
+      returnType = this.inferTypeFromNode(funcExpr.body as t.Expression, typeMap, 0) || returnType;
+    } else if (t.isBlockStatement(funcExpr.body)) {
+      for (const stmt of funcExpr.body.body) {
+        if (t.isReturnStatement(stmt) && stmt.argument) {
+          const argType = this.inferTypeFromNode(stmt.argument, typeMap, 0);
+          if (argType && argType.confidence > returnType.confidence) {
+            returnType = argType;
+          }
+        }
+      }
+    }
+
+    return returnType;
+  }
+
+  /**
+   * Resolve types from usage patterns
+   */
+  private resolveFromUsagePatterns(typeMap: TypeMap, usageMap: Map<string, Set<string>>): void {
+    for (const [name, usages] of usageMap.entries()) {
+      if (!typeMap.has(name)) continue;
+
+      const currentType = typeMap.get(name)!;
+      if (currentType.confidence >= 0.95) continue;
+
+      let inferredType: InferredType | null = null;
+
+      if (usages.has('number') && !usages.has('string') && !usages.has('array')) {
+        inferredType = { typeName: 'number', confidence: 0.8 };
+      } else if (usages.has('string') && !usages.has('array')) {
+        inferredType = { typeName: 'string', confidence: 0.8 };
+      } else if (usages.has('array')) {
+        inferredType = { typeName: 'any[]', confidence: 0.8 };
+      } else if (usages.has('boolean')) {
+        inferredType = { typeName: 'boolean', confidence: 0.8 };
+      } else if (usages.has('number|string')) {
+        if (currentType.confidence >= 0.8 && currentType.typeName === 'number') {
+          continue;
+        }
+        if (usages.has('number') || (usages.size === 1 && currentType.typeName === 'number')) {
+          inferredType = { typeName: 'number', confidence: 0.7 };
+        } else {
+          inferredType = { typeName: 'number | string', confidence: 0.5 };
+        }
+      }
+
+      if (inferredType && inferredType.confidence > currentType.confidence) {
+        typeMap.set(name, inferredType);
+      }
+    }
+  }
+
+  /**
+   * Check if two type maps are equal
+   */
+  private typeMapsEqual(map1: TypeMap, map2: TypeMap): boolean {
+    if (map1.size !== map2.size) return false;
+
+    for (const [key, value1] of map1.entries()) {
+      const value2 = map2.get(key);
+      if (!value2 || value1.typeName !== value2.typeName || value1.confidence !== value2.confidence) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+}

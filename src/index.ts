@@ -2,7 +2,7 @@
 
 import { readFileSync, writeFileSync } from 'fs';
 import { resolve, extname } from 'path';
-import { unminify } from './unminifier';
+import { unminify } from './unminifier-facade';
 
 // Function to parse command line arguments
 function parseArguments(args: string[]): { inputFile: string | undefined, outputFile: string | undefined, options: { renameVariables: boolean, inferTypes: boolean, outputFormat: 'js' | 'ts' } } {

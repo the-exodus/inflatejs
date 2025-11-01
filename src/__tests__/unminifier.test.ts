@@ -1,4 +1,4 @@
-import { unminify } from '../unminifier';
+import { unminify } from '../unminifier-facade';
 
 describe('unminify', () => {
   describe('basic functionality', () => {
