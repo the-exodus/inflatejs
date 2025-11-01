@@ -303,4 +303,378 @@ describe('TypeInferer', () => {
       expect(types.get('x')?.confidence).toBeGreaterThan(0);
     });
   });
+
+  describe('inter-procedural type inference', () => {
+    describe('parameter type inference from call sites', () => {
+      it('should infer parameter type from literal argument', () => {
+        const code = `
+          function greet(name) {
+            return 'Hello ' + name;
+          }
+          greet('John');
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('name')).toBe(true);
+        expect(types.get('name')?.typeName).toBe('string');
+        expect(types.get('name')?.confidence).toBeGreaterThan(0.5);
+      });
+
+      it('should infer parameter type from typed variable argument', () => {
+        const code = `
+          function double(num) {
+            return num * 2;
+          }
+          const x = 42;
+          double(x);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('num')).toBe(true);
+        expect(types.get('num')?.typeName).toBe('number');
+        expect(types.get('num')?.confidence).toBeGreaterThan(0.5);
+      });
+
+      it('should infer parameter types from multiple call sites', () => {
+        const code = `
+          function process(value) {
+            return value;
+          }
+          process(10);
+          process(20);
+          process(30);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('value')).toBe(true);
+        expect(types.get('value')?.typeName).toBe('number');
+      });
+
+      it('should handle multiple parameters from call sites', () => {
+        const code = `
+          function calculate(a, b, c) {
+            return a + b + c;
+          }
+          calculate(1, 2, 3);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('a')?.typeName).toBe('number');
+        expect(types.get('b')?.typeName).toBe('number');
+        expect(types.get('c')?.typeName).toBe('number');
+      });
+    });
+
+    describe('return type inference from function calls', () => {
+      it('should infer return type from called function', () => {
+        const code = `
+          function getString() {
+            return 'hello';
+          }
+          function wrapper() {
+            return getString();
+          }
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('wrapper')).toBe(true);
+        const wrapperType = types.get('wrapper')?.typeName;
+        expect(wrapperType).toContain('string');
+      });
+
+      it('should infer variable type from function return', () => {
+        const code = `
+          function getNumber() {
+            return 42;
+          }
+          const result = getNumber();
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('result')).toBe(true);
+        expect(types.get('result')?.typeName).toBe('number');
+      });
+
+      it('should propagate return types through call chain', () => {
+        const code = `
+          function getBase() {
+            return 100;
+          }
+          function getMiddle() {
+            return getBase();
+          }
+          function getTop() {
+            return getMiddle();
+          }
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('getBase')?.typeName).toContain('number');
+        expect(types.get('getMiddle')?.typeName).toContain('number');
+        expect(types.get('getTop')?.typeName).toContain('number');
+      });
+    });
+
+    describe('assignment tracking across functions', () => {
+      it('should track type through variable assignment and function call', () => {
+        const code = `
+          function transform(input) {
+            return input.toUpperCase();
+          }
+          const text = 'hello';
+          const result = transform(text);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('input')?.typeName).toBe('string');
+        expect(types.get('text')?.typeName).toBe('string');
+        expect(types.get('result')?.typeName).toBe('string');
+      });
+
+      it('should infer parameter type from variable passed as argument', () => {
+        const code = `
+          function processArray(arr) {
+            return arr.length;
+          }
+          const items = [1, 2, 3];
+          processArray(items);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('arr')?.typeName).toContain('[]');
+        expect(types.get('items')?.typeName).toContain('[]');
+      });
+    });
+
+    describe('circular reference handling', () => {
+      it('should handle direct recursion without infinite loop', () => {
+        const code = `
+          function factorial(n) {
+            if (n <= 1) return 1;
+            return n * factorial(n - 1);
+          }
+          factorial(5);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+
+        // Should not hang
+        expect(() => {
+          const types = inferer.inferTypes(ast);
+          expect(types.has('factorial')).toBe(true);
+        }).not.toThrow();
+      });
+
+      it('should handle mutual recursion without infinite loop', () => {
+        const code = `
+          function isEven(n) {
+            if (n === 0) return true;
+            return isOdd(n - 1);
+          }
+          function isOdd(n) {
+            if (n === 0) return false;
+            return isEven(n - 1);
+          }
+          isEven(4);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+
+        // Should not hang
+        expect(() => {
+          const types = inferer.inferTypes(ast);
+          expect(types.has('isEven')).toBe(true);
+          expect(types.has('isOdd')).toBe(true);
+        }).not.toThrow();
+      });
+
+      it('should handle complex call graph cycles', () => {
+        const code = `
+          function a(x) { return b(x); }
+          function b(x) { return c(x); }
+          function c(x) { return a(x); }
+          a(42);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+
+        // Should not hang
+        expect(() => {
+          const types = inferer.inferTypes(ast);
+          expect(types.has('a')).toBe(true);
+        }).not.toThrow();
+      });
+    });
+
+    describe('complex type propagation', () => {
+      it('should infer types through nested function calls', () => {
+        const code = `
+          function add(a, b) {
+            return a + b;
+          }
+          function compute(x, y) {
+            return add(x, y) * 2;
+          }
+          compute(10, 20);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('a')?.typeName).toBe('number');
+        expect(types.get('b')?.typeName).toBe('number');
+        expect(types.get('x')?.typeName).toBe('number');
+        expect(types.get('y')?.typeName).toBe('number');
+      });
+
+      it('should handle parameter used in multiple contexts', () => {
+        const code = `
+          function helper(val) {
+            return val * 2;
+          }
+          function main(data) {
+            const processed = helper(data);
+            return processed + 10;
+          }
+          main(5);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('val')?.typeName).toBe('number');
+        expect(types.get('data')?.typeName).toBe('number');
+      });
+
+      it('should infer array element type from operations', () => {
+        const code = `
+          function sumArray(numbers) {
+            return numbers.reduce((acc, num) => acc + num, 0);
+          }
+          sumArray([1, 2, 3, 4, 5]);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('numbers')?.typeName).toContain('[]');
+      });
+    });
+
+    describe('function signature inference', () => {
+      it('should infer complete function signature with parameter and return types', () => {
+        const code = `
+          function multiply(x, y) {
+            return x * y;
+          }
+          const result = multiply(5, 10);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        const funcType = types.get('multiply')?.typeName;
+        expect(funcType).toBeDefined();
+        // Should contain parameter types and return type
+        expect(funcType).toContain('=>');
+      });
+
+      it('should infer void return for functions with no return', () => {
+        const code = `
+          function logMessage(msg) {
+            console.log(msg);
+          }
+          logMessage('Hello');
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        const funcType = types.get('logMessage')?.typeName;
+        expect(funcType).toContain('void');
+        expect(types.get('msg')?.typeName).toBe('string');
+      });
+
+      it('should handle functions with multiple return types', () => {
+        const code = `
+          function getValue(flag) {
+            if (flag) {
+              return 'string';
+            }
+            return 42;
+          }
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('getValue')).toBe(true);
+        // Should handle union types or pick most confident
+      });
+    });
+
+    describe('edge cases and robustness', () => {
+      it('should handle undefined functions gracefully', () => {
+        const code = `
+          const result = undefinedFunction(42);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('result')).toBe(true);
+        expect(types.get('result')?.typeName).toBe('any');
+      });
+
+      it('should handle immediately invoked function expressions', () => {
+        const code = `
+          const result = (function(x) {
+            return x * 2;
+          })(42);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.has('result')).toBe(true);
+        expect(types.get('result')?.typeName).toBe('number');
+      });
+
+      it('should handle arrow functions as arguments', () => {
+        const code = `
+          function map(arr, fn) {
+            return arr.map(fn);
+          }
+          const numbers = [1, 2, 3];
+          map(numbers, x => x * 2);
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+        const types = inferer.inferTypes(ast);
+
+        expect(types.get('arr')?.typeName).toContain('[]');
+        expect(types.get('fn')?.typeName).toContain('Function');
+      });
+
+      it('should limit traversal depth for very deep call chains', () => {
+        const code = `
+          function level1() { return level2(); }
+          function level2() { return level3(); }
+          function level3() { return level4(); }
+          function level4() { return level5(); }
+          function level5() { return level6(); }
+          function level6() { return level7(); }
+          function level7() { return level8(); }
+          function level8() { return 'deep'; }
+          level1();
+        `;
+        const ast = parser.parse(code, { sourceType: 'module' });
+
+        // Should complete in reasonable time
+        const start = Date.now();
+        const types = inferer.inferTypes(ast);
+        const duration = Date.now() - start;
+
+        expect(duration).toBeLessThan(5000); // Should complete within 5 seconds
+        expect(types.has('level1')).toBe(true);
+      });
+    });
+  });
 });
