@@ -6,6 +6,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 InflateJS is a TypeScript application that unminifies JavaScript code by restoring proper formatting, improving variable names, and inferring types. It uses Babel for AST parsing/generation and Prettier for code formatting.
 
+### Architecture
+
+The application follows **SOLID principles** with a modular, service-oriented architecture. See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed documentation.
+
+**Key architectural features:**
+- **Dependency Injection**: Services receive dependencies via constructor
+- **Interface-based Design**: All major components implement interfaces
+- **Factory Pattern**: UnminificationFactory wires up dependencies
+- **Facade Pattern**: Backward-compatible API through unminifier-facade
+- **Single Responsibility**: Each class has one well-defined purpose
+
+**Main components:**
+- `interfaces/`: Core abstractions and contracts
+- `services/`: Service implementations (parser, generator, transformer, type inference)
+- `factories/`: Object creation and dependency wiring
+- `unminifier-facade.ts`: Simplified, backward-compatible API
+- `index.ts`: CLI entry point
+
 ## Development Commands
 
 ### Build
@@ -50,56 +68,89 @@ npm run test:ci
 ```
 Runs tests in CI mode with coverage and limited workers (optimized for CI environments).
 
-## Architecture
+## Detailed Architecture
 
-### Core Processing Pipeline (src/unminifier.ts)
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for comprehensive architecture documentation.
 
-The unminification process follows a multi-pass approach:
+### Core Processing Pipeline (UnminificationPipeline)
 
-1. **Parsing**: Uses `@babel/parser` to convert minified JavaScript into an AST
-2. **First Pass - Name Collection**: Traverses the AST to identify minified variables (single letters like `a`, `b`, `c` or patterns like `a1`, `b2`) and assigns them meaningful replacement names based on context. Variable renaming is **scope-aware** using Babel's scope tracking to avoid conflicts.
-3. **Second Pass - Transformation**:
-   - Renames all identifiers using collected mappings
-   - Converts arrow functions and function expressions with implicit returns to block statements with explicit returns
-   - Expands shorthand object properties
-4. **Type Inference Pass** (if enabled): Uses `TypeInferer` class to analyze the AST and infer types for variables and function parameters
-5. **Type Annotation** (for TypeScript output): Adds type annotations as JSDoc comments that are later converted to TypeScript syntax
-6. **Code Generation**: Uses `@babel/generator` to produce formatted code from the transformed AST
-7. **Final Formatting**: Applies Prettier for consistent code style
+The unminification process follows a service-oriented approach:
 
-### Type Inference System (src/type-inferer.ts)
+1. **Parsing** (`CodeParser`): Converts minified JavaScript into an AST using `@babel/parser`
+2. **Type Inference** (`TypeInferenceEngine`, optional): Multi-phase type inference
+   - Collection: Gather types from declarations
+   - Call Graph: Build function relationships
+   - Usage Analysis: Track variable usage patterns
+   - Resolution: Resolve final types through inter-procedural analysis
+3. **AST Transformation** (`ASTTransformer`):
+   - Rename identifiers using scope-aware mappings
+   - Expand condensed syntax (arrow functions, shorthand properties)
+4. **Type Annotation** (if enabled): Add JSDoc comments with inferred types
+5. **Code Generation** (`CodeGenerator`): Generate code using `@babel/generator`
+6. **TypeScript Conversion** (if requested): Convert JSDoc to TypeScript syntax
+7. **Formatting** (`CodeFormatter`): Apply Prettier for consistent style
 
-The `TypeInferer` class performs three-pass type analysis:
+### Type Inference System (Modular Services)
 
-1. **Declaration Collection**: Identifies all variable declarations, function declarations, and parameters. Infers types from initial values (literals, array/object expressions, function expressions).
-2. **Usage Analysis**: Tracks how variables are used throughout the code:
-   - Binary operations (`+`, `-`, `*`, `/`, etc.) suggest numeric types
-   - String/Array method calls (`charAt`, `split`, `map`, `filter`, etc.)
-   - Comparisons with literals
+The type inference system uses **four specialized services** coordinated by `TypeInferenceEngine`:
+
+1. **TypeCollector**: Collects initial types from declarations
+   - Literal types, array/object expressions, function types
+   - Known constructor types (String, Number, Date, etc.)
+
+2. **CallGraphBuilder**: Builds function call relationships
+   - Maps all function definitions
+   - Tracks caller-callee relationships
+   - Records call sites with argument types
+
+3. **UsageAnalyzer**: Analyzes variable usage patterns
+   - Binary operations (`+`, `-`, `*`, `/`) → numeric types
+   - Method calls (`charAt`, `split`, `map`, `filter`) → string/array types
+   - Comparisons with literals → inferred types
    - Member access patterns
-3. **Type Resolution**: Combines information from declarations and usage patterns to determine the most likely type with a confidence score (0-1).
 
-The type inferer maintains:
-- `typeMap`: Maps variable names to `InferredType` (type name + confidence)
-- `usageMap`: Tracks all usage patterns for each variable
-- `knownTypes`: Predefined return types for standard JavaScript constructors and methods (src/known-types.ts)
+4. **TypeResolver**: Resolves final types through:
+   - Inter-procedural analysis
+   - Call graph traversal (depth-limited to 8 levels, 5s timeout)
+   - Type propagation through function calls
+   - Iterative convergence (up to 3 iterations)
+   - Confidence-based type selection (0-1 score)
 
 ### Entry Point (src/index.ts)
 
-Command-line argument parsing and file I/O. Calls `unminify()` with appropriate options and handles errors.
+Command-line interface that uses `UnminificationFactory` to create a configured pipeline and process files.
 
 ## Code Organization
 
-- **src/index.ts**: CLI entry point with argument parsing
-- **src/unminifier.ts**: Core unminification logic and AST transformations
-- **src/type-inferer.ts**: Type inference engine
-- **src/types.ts**: TypeScript type definitions for the type inference system
-- **src/known-types.ts**: Map of standard JavaScript types and method return types
+### Service Layer
+- **src/services/code-parser.ts**: Parse JavaScript to AST
+- **src/services/code-generator.ts**: Generate code from AST
+- **src/services/code-formatter.ts**: Format code with Prettier
+- **src/services/name-generator.ts**: Generate meaningful variable names
+- **src/services/scope-manager.ts**: Manage variable scopes and mappings
+- **src/services/ast-transformer.ts**: Transform AST (rename, expand)
+- **src/services/unminification-pipeline.ts**: Orchestrate the complete process
+- **src/services/type-inference/**: Type inference subsystem
+  - **type-collector.ts**: Collect types from declarations
+  - **usage-analyzer.ts**: Analyze variable usage patterns
+  - **call-graph-builder.ts**: Build function call graph
+  - **type-resolver.ts**: Resolve final types
+  - **type-inference-engine.ts**: Coordinate type inference
+
+### Core Files
+- **src/interfaces/index.ts**: All interface definitions (contracts)
+- **src/factories/unminification-factory.ts**: Dependency injection and wiring
+- **src/unminifier-facade.ts**: Backward-compatible API facade
+- **src/index.ts**: CLI entry point
+- **src/types.ts**: TypeScript type definitions
+- **src/known-types.ts**: Standard JavaScript type mappings
+
+### Tests
 - **src/__tests__/**: Test files (Jest)
   - **known-types.test.ts**: Tests for known-types.ts (100% coverage)
-  - **type-inferer.test.ts**: Tests for type inference system (85% coverage)
-  - **unminifier.test.ts**: Tests for unminifier core logic (72% coverage)
-  - **index.test.ts**: Integration tests for CLI
+  - **type-inferer.test.ts**: Tests for type inference system (49 tests)
+  - **unminifier.test.ts**: Tests for unminification (48 tests)
+  - **index.test.ts**: Integration tests for CLI (22 tests)
 
 ## Key Implementation Details
 
