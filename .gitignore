@@ -26,3 +26,5 @@ Thumbs.db
 # Test files
 *.unminified.js
 *.unminified.ts
+coverage/
+__test_temp__/
