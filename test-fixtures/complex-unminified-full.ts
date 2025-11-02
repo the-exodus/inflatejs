@@ -36,9 +36,7 @@ async function s(param8: any): Promise<number> {
   return variable8 + 10;
 }
 class v {
-
   w: any;
-
   x: any;
   constructor(w: any, x: any) {
     this.w = w;
@@ -51,7 +49,7 @@ class v {
     return this.w * a1;
   }
 }
-function b1(param9: number): (any) => number {
+function b1(param9: number): (arg0: any) => number {
   let variable9 = 0;
   function e1(param10: any): number {
     variable9 += param10;

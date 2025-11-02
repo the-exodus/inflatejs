@@ -18,8 +18,11 @@ import {
   UnminificationConfig
 } from '../interfaces';
 import { TypeMap } from '../types';
+import { TypeScriptTypeBuilder } from './typescript-type-builder';
 
 export class UnminificationPipeline implements IUnminificationPipeline {
+  private tsTypeBuilder: TypeScriptTypeBuilder;
+
   constructor(
     private parser: ICodeParser,
     private transformer: IASTTransformer,
@@ -28,7 +31,9 @@ export class UnminificationPipeline implements IUnminificationPipeline {
     private formatter: ICodeFormatter,
     private nameGenerator: INameGenerator,
     private scopeManager: IScopeManager
-  ) {}
+  ) {
+    this.tsTypeBuilder = new TypeScriptTypeBuilder();
+  }
 
   /**
    * Process code through the complete unminification pipeline
@@ -53,20 +58,17 @@ export class UnminificationPipeline implements IUnminificationPipeline {
       nameGenerator: this.nameGenerator
     });
 
-    // Step 4: Add type annotations if requested
-    if (typeMap && (config.inferTypes || config.outputTypeScript)) {
-      this.addTypeAnnotations(ast, typeMap);
-    }
-
-    // Step 5: Generate code from AST
-    let generatedCode = this.generator.generate(ast);
-
-    // Step 6: Convert to TypeScript if requested
+    // Step 4: Add TypeScript type annotations to AST if requested
     if (config.outputTypeScript) {
-      generatedCode = this.convertToTypeScript(generatedCode, typeMap);
+      // Create an empty type map if type inference is disabled
+      const effectiveTypeMap = typeMap || new Map();
+      this.addTypeAnnotations(ast, effectiveTypeMap);
     }
 
-    // Step 7: Format the code
+    // Step 5: Generate code from AST (with TypeScript syntax if annotations were added)
+    const generatedCode = this.generator.generate(ast);
+
+    // Step 6: Format the code
     const parser = config.outputTypeScript ? 'typescript' : 'babel';
     const formattedCode = this.formatter.format(generatedCode, parser);
 
@@ -74,10 +76,11 @@ export class UnminificationPipeline implements IUnminificationPipeline {
   }
 
   /**
-   * Add type annotations to the AST as JSDoc comments
+   * Add TypeScript type annotations directly to the AST
    */
   private addTypeAnnotations(ast: any, typeMap: TypeMap): void {
     traverse(ast, {
+      // Add type annotations to function declarations
       FunctionDeclaration: (path: any) => {
         if (!path.node.id) return;
 
@@ -85,46 +88,147 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         const funcType = typeMap.get(funcName);
 
         if (funcType && funcType.confidence >= 0.7) {
-          // Wrap return type in Promise<> for async functions
-          let typeAnnotation = funcType.typeName;
-          if (path.node.async && typeAnnotation) {
-            // Parse the function type signature and wrap the return type
-            const match = typeAnnotation.match(/^(\([^)]*\))\s*=>\s*(.+)$/);
-            if (match) {
-              const params = match[1];
-              const returnType = match[2].trim();
-              // Only wrap if not already a Promise
-              if (!returnType.startsWith('Promise<')) {
-                typeAnnotation = `${params} => Promise<${returnType}>`;
+          // Parse the function type to get parameter types and return type
+          const parsedType = this.tsTypeBuilder.parseFunctionType(funcType.typeName);
+
+          if (parsedType) {
+            // Add parameter type annotations
+            path.node.params.forEach((param: any, index: number) => {
+              if (t.isIdentifier(param) && parsedType.paramTypes[index]) {
+                const paramTypeStr = parsedType.paramTypes[index];
+                param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramTypeStr);
               }
+            });
+
+            // Add return type annotation
+            let returnTypeStr = parsedType.returnType;
+
+            // Wrap return type in Promise<> for async functions
+            if (path.node.async && !returnTypeStr.startsWith('Promise<')) {
+              returnTypeStr = `Promise<${returnTypeStr}>`;
+            }
+
+            path.node.returnType = this.tsTypeBuilder.createTypeAnnotation(returnTypeStr);
+          }
+        } else {
+          // No inferred type - add explicit 'any' to all parameters
+          path.node.params.forEach((param: any) => {
+            if (t.isIdentifier(param) && !param.typeAnnotation) {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            }
+          });
+        }
+      },
+
+      // Add type annotations to arrow functions
+      ArrowFunctionExpression: (path: any) => {
+        // Add 'any' type to parameters without type annotations
+        path.node.params.forEach((param: any) => {
+          if (t.isIdentifier(param) && !param.typeAnnotation) {
+            param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+          }
+        });
+      },
+
+      // Add type annotations to variable declarations
+      VariableDeclarator: (path: any) => {
+        if (t.isIdentifier(path.node.id)) {
+          const varName = path.node.id.name;
+          const varType = typeMap.get(varName);
+
+          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any') {
+            path.node.id.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+          }
+        }
+      },
+
+      // Add type annotations to class properties and methods
+      ClassBody: (path: any) => {
+        // First, scan constructor for property assignments and create property declarations
+        const constructor = path.node.body.find((member: any) =>
+          t.isClassMethod(member) && member.kind === 'constructor'
+        );
+
+        const propertiesToAdd = new Set<string>();
+
+        if (constructor && t.isBlockStatement(constructor.body)) {
+          // Scan constructor body for this.propName = assignments
+          traverse(constructor.body, {
+            AssignmentExpression: (assignPath: any) => {
+              const left = assignPath.node.left;
+              if (t.isMemberExpression(left) &&
+                  t.isThisExpression(left.object) &&
+                  t.isIdentifier(left.property)) {
+                propertiesToAdd.add(left.property.name);
+              }
+            },
+            noScope: true
+          });
+
+          // Add type annotations to constructor parameters
+          constructor.params.forEach((param: any) => {
+            if (t.isIdentifier(param) && !param.typeAnnotation) {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            }
+          });
+        }
+
+        // Create property declarations and insert them at the beginning of the class
+        const propertyDeclarations: any[] = [];
+        propertiesToAdd.forEach(propName => {
+          const propDecl = t.classProperty(
+            t.identifier(propName),
+            null,
+            this.tsTypeBuilder.createTypeAnnotation('any')
+          );
+          propertyDeclarations.push(propDecl);
+        });
+
+        // Insert property declarations before other members
+        if (propertyDeclarations.length > 0) {
+          path.node.body = [...propertyDeclarations, ...path.node.body];
+        }
+
+        // Handle existing class properties
+        path.node.body.forEach((member: any) => {
+          if (t.isClassProperty(member) && t.isIdentifier(member.key)) {
+            const propName = member.key.name;
+            const propType = typeMap.get(propName);
+
+            if (propType && propType.confidence >= 0.7 && !member.typeAnnotation) {
+              member.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(propType.typeName);
+            } else if (!member.typeAnnotation) {
+              // Default to 'any' for properties without inferred types
+              member.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
             }
           }
 
-          const comment: any = {
-            type: 'CommentBlock',
-            value: `*\n * @type {${typeAnnotation}}\n `
-          };
+          // Handle class methods (non-constructor)
+          if (t.isClassMethod(member) && member.kind !== 'constructor' && t.isIdentifier(member.key)) {
+            const methodName = member.key.name;
+            const methodType = typeMap.get(methodName);
 
-          if (!path.node.leadingComments) {
-            path.node.leadingComments = [];
-          }
-          path.node.leadingComments.push(comment);
-        }
+            if (methodType && methodType.confidence >= 0.7) {
+              const parsedType = this.tsTypeBuilder.parseFunctionType(methodType.typeName);
 
-        // Add parameter type comments
-        path.node.params.forEach((param: any) => {
-          if (t.isIdentifier(param)) {
-            const paramType = typeMap.get(param.name);
-            if (paramType && paramType.confidence >= 0.7) {
-              const paramComment: any = {
-                type: 'CommentLine',
-                value: ` : ${paramType.typeName}`
-              };
+              if (parsedType) {
+                // Add parameter type annotations
+                member.params.forEach((param: any, index: number) => {
+                  if (t.isIdentifier(param) && parsedType.paramTypes[index]) {
+                    param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(parsedType.paramTypes[index]);
+                  }
+                });
 
-              if (!param.trailingComments) {
-                param.trailingComments = [];
+                // Add return type annotation
+                member.returnType = this.tsTypeBuilder.createTypeAnnotation(parsedType.returnType);
               }
-              param.trailingComments.push(paramComment);
+            } else {
+              // Add 'any' types to parameters without inferred types
+              member.params.forEach((param: any) => {
+                if (t.isIdentifier(param) && !param.typeAnnotation) {
+                  param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+                }
+              });
             }
           }
         });
@@ -132,203 +236,4 @@ export class UnminificationPipeline implements IUnminificationPipeline {
     });
   }
 
-  /**
-   * Convert JSDoc type annotations to TypeScript syntax
-   * Also adds explicit 'any' types to untyped parameters
-   */
-  private convertToTypeScript(code: string, typeMap: TypeMap | null): string {
-    let tsCode = code;
-
-    // Convert JSDoc @type annotations to native TypeScript syntax
-    // Pattern: /**\n * @type {(paramType, ...) => returnType}\n */\nfunction name(param, ...)
-    // Handle Promise<T> and other generic types by matching more carefully
-    tsCode = tsCode.replace(
-      /\/\*\*\s*\n\s*\*\s*@type\s*\{(\([^)]*\))\s*=>\s*([^}]+(?:<[^>]+>)?)\}\s*\n\s*\*\/\s*\n\s*(async\s+)?function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)/g,
-      (match, paramTypesStr, returnType, asyncKeyword, functionName, paramsStr) => {
-        // Parse parameter types from JSDoc
-        const paramTypes = paramTypesStr
-          .slice(1, -1) // Remove outer parentheses
-          .split(',')
-          .map((t: string) => t.trim())
-          .filter((t: string) => t.length > 0);
-
-        // Parse parameter names from function signature
-        const paramNames = paramsStr
-          .split(',')
-          .map((p: string) => p.trim())
-          .filter((p: string) => p.length > 0);
-
-        // Build TypeScript parameter list
-        let tsParams = '';
-        for (let i = 0; i < paramNames.length; i++) {
-          if (i > 0) tsParams += ', ';
-          const paramType = paramTypes[i] || 'any';
-          tsParams += `${paramNames[i]}: ${paramType}`;
-        }
-
-        // Build TypeScript function signature
-        const async = asyncKeyword || '';
-        return `${async}function ${functionName}(${tsParams}): ${returnType.trim()}`;
-      }
-    );
-
-    // Also handle nested functions with indentation (including Promise<> types)
-    tsCode = tsCode.replace(
-      /\/\*\*\s*\n\s+\*\s*@type\s*\{(\([^)]*\))\s*=>\s*([^}]+(?:<[^>]+>)?)\}\s*\n\s+\*\/\s*\n\s+(async\s+)?function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)/g,
-      (match, paramTypesStr, returnType, asyncKeyword, functionName, paramsStr) => {
-        const paramTypes = paramTypesStr
-          .slice(1, -1)
-          .split(',')
-          .map((t: string) => t.trim())
-          .filter((t: string) => t.length > 0);
-
-        const paramNames = paramsStr
-          .split(',')
-          .map((p: string) => p.trim())
-          .filter((p: string) => p.length > 0);
-
-        let tsParams = '';
-        for (let i = 0; i < paramNames.length; i++) {
-          if (i > 0) tsParams += ', ';
-          const paramType = paramTypes[i] || 'any';
-          tsParams += `${paramNames[i]}: ${paramType}`;
-        }
-
-        const async = asyncKeyword || '';
-        // Preserve indentation
-        const indent = match.match(/\n(\s+)function/)?.[1] || '  ';
-        return `${indent}${async}function ${functionName}(${tsParams}): ${returnType.trim()}`;
-      }
-    );
-
-    // Add explicit 'any' type to function parameters that don't have type annotations
-    // Match functions without preceding JSDoc comments
-    tsCode = tsCode.replace(
-      /^(\s*)(async\s+)?function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)(?!\s*:\s*)/gm,
-      (match, indent, asyncKeyword, functionName, paramsStr) => {
-        // Skip if parameters are already typed
-        if (paramsStr.includes(':')) {
-          return match;
-        }
-
-        const params = paramsStr
-          .split(',')
-          .map((p: string) => p.trim())
-          .filter((p: string) => p.length > 0);
-
-        if (params.length === 0) {
-          return match;
-        }
-
-        // Add explicit 'any' type to all parameters
-        const typedParams = params.map((p: string) => `${p}: any`).join(', ');
-        const async = asyncKeyword || '';
-        return `${indent}${async}function ${functionName}(${typedParams})`;
-      }
-    );
-
-    // Handle single-parameter arrow functions without parentheses
-    tsCode = tsCode.replace(
-      /([^a-zA-Z_$])([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=>\s*\{/g,
-      (match, before, param) => {
-        return `${before}(${param}: any) => {`;
-      }
-    );
-
-    // Handle arrow functions with parentheses
-    // Only match arrow functions that have clear, untyped parameters
-    tsCode = tsCode.replace(
-      /\(([a-zA-Z_$][a-zA-Z0-9_$]*(?:\s*,\s*[a-zA-Z_$][a-zA-Z0-9_$]*)*)\)\s*=>\s*\{/g,
-      (match, paramsStr) => {
-        // Skip if already typed
-        if (paramsStr.includes(':')) {
-          return match;
-        }
-
-        const params = paramsStr.split(',').map((p: string) => p.trim());
-        const typedParams = params.map((p: string) => `${p}: any`).join(', ');
-        return `(${typedParams}) => {`;
-      }
-    );
-
-
-    // Handle class methods without type annotations
-    // Be careful not to match for loop increments or other expressions
-    tsCode = tsCode.replace(
-      /^(\s+)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)\s*\{/gm,
-      (match, indent, methodName, paramsStr) => {
-        // Skip if already typed
-        if (paramsStr.includes(':')) {
-          return match;
-        }
-
-        // Skip if it's a control structure keyword
-        const controlKeywords = ['if', 'while', 'for', 'switch', 'catch', 'with'];
-        if (controlKeywords.includes(methodName)) {
-          return match;
-        }
-
-        const params = paramsStr
-          .split(',')
-          .map((p: string) => p.trim())
-          .filter((p: string) => p.length > 0);
-
-        if (params.length === 0) {
-          return match;
-        }
-
-        const typedParams = params.map((p: string) => `${p}: any`).join(', ');
-        return `${indent}${methodName}(${typedParams}) {`;
-      }
-    );
-
-    // Handle class constructors and add property declarations
-    tsCode = tsCode.replace(
-      /class\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\{(\s*)constructor\s*\(([^)]*)\)\s*\{([^}]*this\.(\w+)[^}]*)\}/g,
-      (match, className, spacing, constructorParams, constructorBody) => {
-        // Extract all property assignments from constructor
-        const propertyPattern = /this\.(\w+)\s*=/g;
-        const properties = new Set<string>();
-        let propMatch;
-        while ((propMatch = propertyPattern.exec(constructorBody)) !== null) {
-          properties.add(propMatch[1]);
-        }
-
-        // Type constructor parameters
-        let typedParams = constructorParams;
-        if (constructorParams && !constructorParams.includes(':')) {
-          const params = constructorParams.split(',').map((p: string) => p.trim());
-          typedParams = params.map((p: string) => `${p}: any`).join(', ');
-        }
-
-        // Build property declarations
-        const propertyDeclarations = Array.from(properties)
-          .map((prop: string) => `${spacing}${prop}: any;`)
-          .join('\n');
-
-        return `class ${className} {${propertyDeclarations ? '\n' + propertyDeclarations : ''}${spacing}constructor(${typedParams}) {${constructorBody}}`;
-      }
-    );
-
-    // Add type annotations to variable declarations when we have type information
-    if (typeMap) {
-      // Match: const/let/var variableName = ...
-      tsCode = tsCode.replace(
-        /^(\s*)(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/gm,
-        (match, indent, keyword, varName) => {
-          const varType = typeMap.get(varName);
-          // Only add annotation if we have a type with good confidence and it's not 'any'
-          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any') {
-            return `${indent}${keyword} ${varName}: ${varType.typeName} =`;
-          }
-          return match;
-        }
-      );
-    }
-
-    // Final cleanup: Remove any erroneous `: any` after increment/decrement operators
-    tsCode = tsCode.replace(/(\+\+|--)\s*:\s*any/g, '$1');
-
-    return tsCode;
-  }
 }
