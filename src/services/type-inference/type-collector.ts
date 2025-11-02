@@ -115,6 +115,8 @@ export class TypeCollector implements ITypeCollector {
         return { typeName: 'Function', confidence: 0.9 };
       case 'CallExpression':
         return this.inferCallExpressionType(node);
+      case 'NewExpression':
+        return this.inferNewExpressionType(node);
       default:
         return { typeName: 'any', confidence: 0.1 };
     }
@@ -164,5 +166,40 @@ export class TypeCollector implements ITypeCollector {
       }
     }
     return { typeName: 'any', confidence: 0.3 };
+  }
+
+  /**
+   * Infer type from new expression (constructor calls)
+   */
+  private inferNewExpressionType(node: t.NewExpression): InferredType {
+    if (t.isIdentifier(node.callee)) {
+      const constructorName = node.callee.name;
+
+      // Handle known constructors
+      const knownConstructors: Record<string, string> = {
+        'Date': 'Date',
+        'Error': 'Error',
+        'RegExp': 'RegExp',
+        'Map': 'Map<any, any>',
+        'Set': 'Set<any>',
+        'WeakMap': 'WeakMap<any, any>',
+        'WeakSet': 'WeakSet<any>',
+        'Promise': 'Promise<any>',
+        'Array': 'any[]',
+        'Object': 'object'
+      };
+
+      if (knownConstructors[constructorName]) {
+        return {
+          typeName: knownConstructors[constructorName],
+          confidence: 0.9
+        };
+      }
+
+      // Unknown constructor - use the constructor name as the type
+      return { typeName: constructorName, confidence: 0.7 };
+    }
+
+    return { typeName: 'object', confidence: 0.5 };
   }
 }

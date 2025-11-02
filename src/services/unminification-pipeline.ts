@@ -58,6 +58,11 @@ export class UnminificationPipeline implements IUnminificationPipeline {
       nameGenerator: this.nameGenerator
     });
 
+    // Step 3.5: Update typeMap with renamed variable names
+    if (typeMap && config.renameVariables) {
+      typeMap = this.updateTypeMapWithRenamedVariables(ast, typeMap);
+    }
+
     // Step 4: Add TypeScript type annotations to AST if requested
     if (config.outputTypeScript) {
       // Create an empty type map if type inference is disabled
@@ -234,6 +239,30 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         });
       }
     });
+  }
+
+  /**
+   * Update typeMap to use renamed variable names instead of original names
+   * This is necessary because type inference happens before variable renaming
+   */
+  private updateTypeMapWithRenamedVariables(ast: any, oldTypeMap: TypeMap): TypeMap {
+    const newTypeMap: TypeMap = new Map();
+    const renameMappings = this.scopeManager.getAllRenameMappings();
+
+    // Update typeMap keys based on rename mappings
+    for (const [originalName, typeInfo] of oldTypeMap.entries()) {
+      const renamedName = renameMappings.get(originalName);
+
+      if (renamedName) {
+        // Variable was renamed, use the new name
+        newTypeMap.set(renamedName, typeInfo);
+      } else {
+        // Variable was not renamed (e.g., non-minified names), keep original name
+        newTypeMap.set(originalName, typeInfo);
+      }
+    }
+
+    return newTypeMap;
   }
 
 }

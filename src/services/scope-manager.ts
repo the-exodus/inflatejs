@@ -49,6 +49,24 @@ export class ScopeManager implements IScopeManager {
   }
 
   /**
+   * Get all rename mappings across all scopes
+   * Returns a map of originalName -> renamedName
+   */
+  public getAllRenameMappings(): Map<string, string> {
+    const allMappings = new Map<string, string>();
+
+    for (const scopeMap of this.scopeMappings.values()) {
+      for (const [originalName, renamedName] of scopeMap.entries()) {
+        // Store the mapping - note that the same original name might exist in multiple scopes
+        // In that case, we'll use the most recent mapping (which should be fine for our purposes)
+        allMappings.set(originalName, renamedName);
+      }
+    }
+
+    return allMappings;
+  }
+
+  /**
    * Clear all scope mappings
    */
   public clear(): void {

@@ -58,6 +58,7 @@ export interface IScopeManager {
   getOrCreateMapping(name: string, scopeId: string, context: NameContext): string;
   hasMapping(name: string, scopeId: string): boolean;
   getMapping(name: string, scopeId: string): string | undefined;
+  getAllRenameMappings(): Map<string, string>;
   clear(): void;
 }
 

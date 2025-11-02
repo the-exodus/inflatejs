@@ -93,8 +93,8 @@ export class TypeResolver implements ITypeResolver {
       this.inferFunctionReturnType(funcInfo, typeMap, callGraph, 0, visited);
     }
 
-    // Update variable types from function calls
-    this.updateVariableTypesFromCalls(typeMap, callGraph);
+    // Update variable types from all assignments
+    this.propagateTypes(typeMap, callGraph);
   }
 
   /**
@@ -277,6 +277,35 @@ export class TypeResolver implements ITypeResolver {
   }
 
   /**
+   * Infer the type of a property access (not a method call)
+   */
+  private inferPropertyType(objType: string, propertyName: string): InferredType | null {
+    // Handle .length property
+    if (propertyName === 'length') {
+      if (objType === 'string' || objType.includes('[]')) {
+        return { typeName: 'number', confidence: 1.0 };
+      }
+    }
+
+    // Handle common properties
+    if (objType === 'string') {
+      // String properties that return string
+      if (['constructor'].includes(propertyName)) {
+        return { typeName: 'Function', confidence: 0.8 };
+      }
+    }
+
+    if (objType.includes('[]')) {
+      // Array properties
+      if (['constructor'].includes(propertyName)) {
+        return { typeName: 'Function', confidence: 0.8 };
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Basic type inference from node
    */
   private inferTypeFromNode(node: t.Node, typeMap: TypeMap, depth: number): InferredType | null {
@@ -300,6 +329,8 @@ export class TypeResolver implements ITypeResolver {
         return this.inferCallType(node, typeMap);
       case 'AwaitExpression':
         return this.inferAwaitType(node as t.AwaitExpression, typeMap, depth);
+      case 'NewExpression':
+        return this.inferNewExpressionType(node as t.NewExpression, typeMap, depth);
       case 'Identifier':
         return typeMap.get(node.name) || { typeName: 'any', confidence: 0.1 };
       case 'BinaryExpression':
@@ -370,33 +401,91 @@ export class TypeResolver implements ITypeResolver {
   }
 
   /**
-   * Update variable types from function call results
+   * Propagate types across variables through assignments, calls, and operations
+   * This is called iteratively to refine types across multiple passes
    */
-  private updateVariableTypesFromCalls(typeMap: TypeMap, callGraph: CallGraphResult): void {
+  private propagateTypes(typeMap: TypeMap, callGraph: CallGraphResult): void {
     if (!this.currentAst) return;
 
     traverse(this.currentAst, {
       VariableDeclarator: (path) => {
-        if (!t.isIdentifier(path.node.id) || !t.isCallExpression(path.node.init)) return;
+        if (!t.isIdentifier(path.node.id) || !path.node.init) return;
 
         const varName = path.node.id.name;
-        const callExpr = path.node.init;
+        const init = path.node.init;
+        let inferredType: InferredType | null = null;
 
-        if (t.isIdentifier(callExpr.callee)) {
-          const funcInfo = callGraph.functions.get(callExpr.callee.name);
-          if (funcInfo?.returnType) {
-            const currentType = typeMap.get(varName);
-            if (!currentType || funcInfo.returnType.confidence > currentType.confidence) {
-              typeMap.set(varName, funcInfo.returnType);
+        // Case 1: Variable assigned from another variable (const a = b)
+        if (t.isIdentifier(init)) {
+          const sourceType = typeMap.get(init.name);
+          if (sourceType) {
+            inferredType = { ...sourceType, confidence: sourceType.confidence * 0.9 };
+          }
+        }
+        // Case 2: Variable assigned from function call (const a = func())
+        else if (t.isCallExpression(init)) {
+          // Method calls (obj.method())
+          if (t.isMemberExpression(init.callee)) {
+            if (t.isIdentifier(init.callee.object) && t.isIdentifier(init.callee.property)) {
+              const objType = typeMap.get(init.callee.object.name);
+              if (objType) {
+                inferredType = this.inferMethodReturnType(objType.typeName, init.callee.property.name);
+              }
+            }
+          }
+          // Function calls (func())
+          else if (t.isIdentifier(init.callee)) {
+            const funcInfo = callGraph.functions.get(init.callee.name);
+            if (funcInfo?.returnType) {
+              inferredType = funcInfo.returnType;
+            }
+          }
+          // Handle IIFEs
+          else if (t.isFunctionExpression(init.callee) || t.isArrowFunctionExpression(init.callee)) {
+            inferredType = this.inferIIFEReturnType(init, typeMap);
+          }
+        }
+        // Case 3: Variable assigned from await expression (const a = await promise)
+        else if (t.isAwaitExpression(init)) {
+          const awaitedType = this.inferTypeFromNode(init.argument, typeMap, 0);
+          if (awaitedType) {
+            // Unwrap Promise<T> to T
+            const promiseMatch = awaitedType.typeName.match(/^Promise<(.+)>$/);
+            if (promiseMatch) {
+              inferredType = {
+                typeName: promiseMatch[1],
+                confidence: awaitedType.confidence * 0.95
+              };
+            } else {
+              // If not a Promise type, use as-is
+              inferredType = awaitedType;
             }
           }
         }
-        // Handle IIFEs
-        else if (t.isFunctionExpression(callExpr.callee) || t.isArrowFunctionExpression(callExpr.callee)) {
-          const returnType = this.inferIIFEReturnType(callExpr, typeMap);
+        // Case 4: Variable assigned from binary expression (const s = "a" + b)
+        else if (t.isBinaryExpression(init)) {
+          inferredType = this.inferBinaryExpressionType(init, typeMap, 0);
+        }
+        // Case 5: Variable assigned from member expression (const x = obj.prop)
+        else if (t.isMemberExpression(init)) {
+          if (t.isIdentifier(init.object) && t.isIdentifier(init.property)) {
+            const objType = typeMap.get(init.object.name);
+            if (objType) {
+              // This is property access, not a method call
+              inferredType = this.inferPropertyType(objType.typeName, init.property.name);
+            }
+          }
+        }
+        // Case 6: Any other expression type
+        else {
+          inferredType = this.inferTypeFromNode(init, typeMap, 0);
+        }
+
+        // Update type map if we inferred a better type
+        if (inferredType) {
           const currentType = typeMap.get(varName);
-          if (!currentType || returnType.confidence > currentType.confidence) {
-            typeMap.set(varName, returnType);
+          if (!currentType || inferredType.confidence > currentType.confidence) {
+            typeMap.set(varName, inferredType);
           }
         }
       }
@@ -494,6 +583,77 @@ export class TypeResolver implements ITypeResolver {
 
     // If it's not a Promise type, return as-is (might be 'any' or unknown)
     return argType;
+  }
+
+  /**
+   * Infer type from new expression (e.g., new Promise, new Date)
+   */
+  private inferNewExpressionType(node: t.NewExpression, typeMap: TypeMap, depth: number): InferredType {
+    // Check if this is a Promise constructor
+    if (t.isIdentifier(node.callee) && node.callee.name === 'Promise') {
+      // new Promise((resolve, reject) => { ... })
+      const executor = node.arguments[0];
+
+      if (executor && (t.isFunctionExpression(executor) || t.isArrowFunctionExpression(executor))) {
+        // Try to infer the type passed to resolve
+        const resolveParam = executor.params[0];
+
+        if (resolveParam && t.isIdentifier(resolveParam)) {
+          const resolveName = resolveParam.name;
+          let resolvedType: InferredType = { typeName: 'any', confidence: 0.5 };
+
+          // Traverse the executor function to find calls to resolve
+          traverse(executor, {
+            CallExpression: (callPath: any) => {
+              if (t.isIdentifier(callPath.node.callee) &&
+                  callPath.node.callee.name === resolveName &&
+                  callPath.node.arguments.length > 0) {
+                // Found a call to resolve(value)
+                const arg = callPath.node.arguments[0];
+                const argType = this.inferTypeFromNode(arg, typeMap, depth + 1);
+                if (argType && argType.confidence > resolvedType.confidence) {
+                  resolvedType = argType;
+                }
+              }
+            },
+            noScope: true
+          });
+
+          return {
+            typeName: `Promise<${resolvedType.typeName}>`,
+            confidence: Math.max(0.7, resolvedType.confidence * 0.9)
+          };
+        }
+      }
+
+      // Fallback for Promise constructor
+      return { typeName: 'Promise<any>', confidence: 0.6 };
+    }
+
+    // Handle other known constructors
+    if (t.isIdentifier(node.callee)) {
+      const constructorName = node.callee.name;
+
+      // Known constructors
+      const knownConstructors: Record<string, string> = {
+        'Date': 'Date',
+        'Error': 'Error',
+        'RegExp': 'RegExp',
+        'Map': 'Map<any, any>',
+        'Set': 'Set<any>',
+        'WeakMap': 'WeakMap<any, any>',
+        'WeakSet': 'WeakSet<any>'
+      };
+
+      if (knownConstructors[constructorName]) {
+        return { typeName: knownConstructors[constructorName], confidence: 0.9 };
+      }
+
+      // Unknown constructor - return the constructor name as type
+      return { typeName: constructorName, confidence: 0.7 };
+    }
+
+    return { typeName: 'object', confidence: 0.5 };
   }
 
   /**

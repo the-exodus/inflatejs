@@ -24,7 +24,7 @@ function l(param5: number[]): number {
   }
   return variable6;
 }
-function p(param6: any) {
+function p(param6: any): Promise<number> {
   return new Promise((param7: any) => {
     setTimeout(() => {
       return param7(param6 * 2);
@@ -111,7 +111,7 @@ function i2(param17: string): number {
   return variable24 + variable26 + variable25;
 }
 const variable27 = i2("JavaScript");
-function o2(param18: any, value5: any) {
+function o2(param18: number, value5: number): Promise<number> {
   return new Promise((param19: any, value6: any) => {
     if (param18 > 0) {
       param19(param18 * value5);

@@ -23,29 +23,62 @@ export class TypeInferenceEngine implements ITypeInferenceEngine {
   ) {}
 
   /**
-   * Infer types for all variables and functions in the AST
-   * Coordinates the four-step process:
-   * 1. Collect initial types from declarations
-   * 2. Build call graph
-   * 3. Analyze variable usage
-   * 4. Resolve final types
+   * Infer types for all variables and functions in the AST using multi-pass iterative refinement
+   *
+   * Algorithm:
+   * 1. Collect initial types from declarations (literals, known constructors)
+   * 2. Build call graph (function relationships)
+   * 3. Iteratively refine types until convergence:
+   *    - Analyze variable usage patterns
+   *    - Resolve types based on assignments, calls, and usage
+   *    - Propagate types across variables
+   *    - Continue until no new type information is discovered
    */
   public inferTypes(ast: t.File): TypeMap {
-    // Step 1: Collect initial types from declarations
+    // Pass 1: Collect initial types from declarations
     const typeMap = this.typeCollector.collectTypes(ast);
 
-    // Step 2: Build call graph
+    // Pass 2: Build call graph (stable across iterations)
     const callGraph = this.callGraphBuilder.buildCallGraph(ast);
 
-    // Step 3: Analyze variable usage patterns
-    const usageMap = this.usageAnalyzer.analyzeUsage(ast, typeMap);
-
-    // Step 4: Resolve final types using all collected information
     // Pass AST to resolver for variable type updates
     if ('setCurrentAst' in this.typeResolver) {
       (this.typeResolver as any).setCurrentAst(ast);
     }
 
-    return this.typeResolver.resolveTypes(typeMap, usageMap, callGraph);
+    // Multi-pass iterative refinement
+    const maxIterations = 5; // Prevent infinite loops
+    let previousTypeMapSnapshot: string | null = null;
+
+    for (let iteration = 0; iteration < maxIterations; iteration++) {
+      // Create snapshot of current type map to detect convergence
+      const currentSnapshot = this.serializeTypeMap(typeMap);
+
+      // Check for convergence - if no types changed, we're done
+      if (currentSnapshot === previousTypeMapSnapshot) {
+        break;
+      }
+
+      previousTypeMapSnapshot = currentSnapshot;
+
+      // Pass 3.N: Analyze variable usage patterns
+      const usageMap = this.usageAnalyzer.analyzeUsage(ast, typeMap);
+
+      // Pass 4.N: Resolve types using all collected information
+      this.typeResolver.resolveTypes(typeMap, usageMap, callGraph);
+    }
+
+    return typeMap;
+  }
+
+  /**
+   * Serialize type map for comparison to detect convergence
+   */
+  private serializeTypeMap(typeMap: TypeMap): string {
+    const entries: string[] = [];
+    for (const [name, type] of typeMap.entries()) {
+      entries.push(`${name}:${type.typeName}:${type.confidence.toFixed(2)}`);
+    }
+    return entries.sort().join('|');
   }
 }
