@@ -216,6 +216,22 @@ export class TypeCollector implements ITypeCollector {
       }
     }
 
+    // Handle static method calls (e.g., Object.keys(), Array.isArray())
+    if (t.isMemberExpression(node.callee) &&
+        t.isIdentifier(node.callee.object) &&
+        t.isIdentifier(node.callee.property)) {
+      const objectName = node.callee.object.name;
+      const methodName = node.callee.property.name;
+      const fullName = `${objectName}.${methodName}`;
+
+      if (knownTypes.has(fullName)) {
+        return {
+          typeName: knownTypes.get(fullName)!,
+          confidence: 0.9
+        };
+      }
+    }
+
     // Handle direct function calls
     if (t.isIdentifier(node.callee)) {
       const calleeName = node.callee.name;

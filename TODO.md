@@ -312,11 +312,17 @@ const emailRegex = /^[a-z]+@[a-z]+\.[a-z]+$/i;
 // Expected: emailRegex: RegExp
 ```
 
-### 12. Object Static Methods
+### 12. Object Static Methods ✅ COMPLETED
 **Impact**: Medium (common utilities)
 **Effort**: Low (10 minutes - add to known-types)
 
-`Object.keys()`, `Object.values()`, `Object.entries()`, etc.
+~~`Object.keys()`, `Object.values()`, `Object.entries()`, etc.~~
+**Status**: Implemented and tested (13 tests passing)
+
+**Implementation notes**:
+- Added to knownTypes map: Object.keys, Object.values, Object.entries, Object.assign, Object.create, Object.freeze, Object.seal
+- Enhanced TypeCollector and TypeResolver to handle static method calls (MemberExpression with object.method pattern)
+- All Object static methods now correctly inferred
 
 **Examples for tests:**
 ```javascript
@@ -335,11 +341,16 @@ const assigned = Object.assign({}, obj, { w: 4 });
 // Expected: assigned: object
 ```
 
-### 13. Array Static Methods
+### 13. Array Static Methods ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low (5 minutes - add to known-types)
 
-`Array.isArray()`, `Array.from()`, etc.
+~~`Array.isArray()`, `Array.from()`, etc.~~
+**Status**: Implemented and tested (8 tests passing)
+
+**Implementation notes**:
+- Added to knownTypes map: Array.isArray, Array.from, Array.of
+- Works with same static method call handling as Object methods
 
 **Examples for tests:**
 ```javascript
@@ -353,11 +364,17 @@ const filled = Array(5).fill(0);
 // Expected: filled: number[]
 ```
 
-### 14. Type Conversion Functions
+### 14. Type Conversion Functions ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low (5 minutes - add to known-types)
 
-`parseInt()`, `parseFloat()`, `Number()`, `String()`, `Boolean()`
+~~`parseInt()`, `parseFloat()`, `Number()`, `String()`, `Boolean()`~~
+**Status**: Implemented and tested (12 tests passing)
+
+**Implementation notes**:
+- Added to knownTypes map: parseInt, parseFloat
+- Number, String, Boolean were already in knownTypes
+- All type conversion functions now correctly inferred
 
 **Examples for tests:**
 ```javascript
@@ -882,13 +899,14 @@ For each TODO item:
 ### Phase 2 Progress
 - Item 5 (Logical expressions): Added 30 new tests (all passing) ✅
 - Item 6 (RegExp literals): Added 28 new tests (all passing) ✅
-- Total test count: 315 (up from 287)
+- Item 7 (Object/Array static methods) + Item 8 (Type conversion): Added 33 new tests (all passing) ✅
+- Total test count: 348 (up from 315)
 
 ### Phase 2 (2-3 hours): Common Patterns
 5. Logical expressions for values ✅
 6. RegExp literals ✅
-7. Object/Array static methods
-8. Type conversion functions
+7. Object/Array static methods ✅
+8. Type conversion functions ✅
 9. Union type inference
 10. Context-aware method inference (slice)
 

@@ -24,7 +24,19 @@ export const knownTypes: Map<string, string> = new Map([
   ['String.prototype.split', 'string[]'],
   ['String.prototype.replace', 'string'],
   ['String.prototype.match', 'RegExpMatchArray | null'],
+  // Object static methods
   ['Object.keys', 'string[]'],
   ['Object.values', 'any[]'],
   ['Object.entries', '[string, any][]'],
+  ['Object.assign', 'object'],
+  ['Object.create', 'object'],
+  ['Object.freeze', 'object'],
+  ['Object.seal', 'object'],
+  // Array static methods
+  ['Array.isArray', 'boolean'],
+  ['Array.from', 'any[]'],
+  ['Array.of', 'any[]'],
+  // Type conversion functions
+  ['parseInt', 'number'],
+  ['parseFloat', 'number'],
 ]);

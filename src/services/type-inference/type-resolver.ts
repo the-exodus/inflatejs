@@ -407,9 +407,27 @@ export class TypeResolver implements ITypeResolver {
    * Infer type from call expression
    */
   private inferCallType(node: t.CallExpression, typeMap: TypeMap): InferredType {
+    // Handle static method calls (e.g., Object.keys(), Array.isArray())
+    if (t.isMemberExpression(node.callee) &&
+        t.isIdentifier(node.callee.object) &&
+        t.isIdentifier(node.callee.property)) {
+      const objectName = node.callee.object.name;
+      const methodName = node.callee.property.name;
+      const fullName = `${objectName}.${methodName}`;
+
+      if (knownTypes.has(fullName)) {
+        return {
+          typeName: knownTypes.get(fullName)!,
+          confidence: 0.9
+        };
+      }
+    }
+
+    // Handle direct function calls
     if (t.isIdentifier(node.callee) && knownTypes.has(node.callee.name)) {
       return { typeName: knownTypes.get(node.callee.name)!, confidence: 0.8 };
     }
+
     return { typeName: 'any', confidence: 0.3 };
   }
 
