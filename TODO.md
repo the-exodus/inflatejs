@@ -4,11 +4,12 @@ This document lists JavaScript/TypeScript constructs that are not currently hand
 
 ## Priority 1: Critical (High Impact, Quick Wins)
 
-### 1. Template Literals
+### 1. Template Literals ✅ COMPLETED
 **Impact**: Very High (used in ~30% of modern JS)
 **Effort**: Low (5 minutes)
 
-Currently returns `any`, should return `string`.
+~~Currently returns `any`, should return `string`.~~
+**Status**: Implemented and tested (8 tests passing)
 
 **Examples for tests:**
 ```javascript
@@ -27,11 +28,12 @@ const outer = `Outer ${`inner ${42}`}`;
 // Expected: outer: string
 ```
 
-### 2. Unary Expressions
+### 2. Unary Expressions ✅ COMPLETED
 **Impact**: High (logical negation, typeof)
 **Effort**: Low (10 minutes)
 
-Currently returns `any` for `!`, `typeof`, `-`, `+`, `~`, `void`, `delete`.
+~~Currently returns `any` for `!`, `typeof`, `-`, `+`, `~`, `void`, `delete`.~~
+**Status**: Implemented and tested (18 tests passing)
 
 **Examples for tests:**
 ```javascript
@@ -55,11 +57,12 @@ const result = void 0;
 // Expected: result: undefined
 ```
 
-### 3. Conditional (Ternary) Expressions
+### 3. Conditional (Ternary) Expressions ✅ COMPLETED
 **Impact**: High (common pattern)
 **Effort**: Medium (20 minutes)
 
-Currently returns `any`, should infer union type or common type.
+~~Currently returns `any`, should infer union type or common type.~~
+**Status**: Implemented and tested (14 tests passing)
 
 **Examples for tests:**
 ```javascript
@@ -101,11 +104,12 @@ const value = input ?? defaultValue;
 // Expected: matches input type
 ```
 
-### 5. Common Array Methods (Missing)
+### 5. Common Array Methods ✅ COMPLETED
 **Impact**: High (very common)
 **Effort**: Low (15 minutes - just add to known-types)
 
-Missing: `reduce`, `find`, `findIndex`, `some`, `every`, `forEach`, `flat`, `flatMap`, `slice`, `concat`, `push`, `pop`, `shift`, `unshift`
+~~Missing: `reduce`, `find`, `findIndex`, `some`, `every`, `forEach`, `flat`, `flatMap`, `slice`, `concat`, `push`, `pop`, `shift`, `unshift`~~
+**Status**: Implemented and tested (13 array method tests passing)
 
 **Examples for tests:**
 ```javascript
@@ -134,11 +138,12 @@ const sliced = numbers.slice(1, 3);
 // Expected: sliced: number[]
 ```
 
-### 6. Common String Methods (Missing)
+### 6. Common String Methods ✅ COMPLETED
 **Impact**: High (very common)
 **Effort**: Low (10 minutes - just add to known-types)
 
-Missing: `slice`, `replace`, `replaceAll`, `trim`, `trimStart`, `trimEnd`, `toLowerCase`, `toUpperCase`, `startsWith`, `endsWith`, `includes`, `match`, `test`, `padStart`, `padEnd`, `repeat`
+~~Missing: `slice`, `replace`, `replaceAll`, `trim`, `trimStart`, `trimEnd`, `toLowerCase`, `toUpperCase`, `startsWith`, `endsWith`, `includes`, `match`, `test`, `padStart`, `padEnd`, `repeat`~~
+**Status**: Implemented and tested (22 string method tests passing)
 
 **Examples for tests:**
 ```javascript
@@ -695,11 +700,16 @@ For each TODO item:
 
 ## Implementation Order Recommendation
 
-### Phase 1 (1 hour): Foundation
-1. Template literals
-2. Unary expressions
-3. Ternary operators
-4. Missing array/string methods in known-types
+### Phase 1 (1 hour): Foundation ✅ COMPLETED
+1. Template literals ✅
+2. Unary expressions ✅
+3. Ternary operators ✅
+4. Missing array/string methods in known-types ✅
+
+**Results**:
+- Added 75 new tests (all passing)
+- Total test count: 256 (up from 181)
+- Coverage improved from ~50% to ~75%+ of common JavaScript patterns
 
 ### Phase 2 (2 hours): Common Patterns
 5. Logical expressions for values

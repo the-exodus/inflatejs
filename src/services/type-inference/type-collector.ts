@@ -106,6 +106,8 @@ export class TypeCollector implements ITypeCollector {
         return { typeName: 'boolean', confidence: 1.0 };
       case 'NullLiteral':
         return { typeName: 'null', confidence: 1.0 };
+      case 'TemplateLiteral':
+        return { typeName: 'string', confidence: 1.0 };
       case 'ArrayExpression':
         return this.inferArrayType(node);
       case 'ObjectExpression':
@@ -117,6 +119,10 @@ export class TypeCollector implements ITypeCollector {
         return this.inferCallExpressionType(node);
       case 'NewExpression':
         return this.inferNewExpressionType(node);
+      case 'UnaryExpression':
+        return this.inferUnaryExpressionType(node);
+      case 'ConditionalExpression':
+        return this.inferConditionalExpressionType(node);
       default:
         return { typeName: 'any', confidence: 0.1 };
     }
@@ -201,5 +207,63 @@ export class TypeCollector implements ITypeCollector {
     }
 
     return { typeName: 'object', confidence: 0.5 };
+  }
+
+  /**
+   * Infer type from unary expression
+   */
+  private inferUnaryExpressionType(node: t.UnaryExpression): InferredType {
+    switch (node.operator) {
+      case '!':
+        // Logical NOT always returns boolean
+        return { typeName: 'boolean', confidence: 1.0 };
+
+      case 'typeof':
+        // typeof always returns string
+        return { typeName: 'string', confidence: 1.0 };
+
+      case '+':
+      case '-':
+      case '~':
+        // Unary +, -, and bitwise NOT return number
+        return { typeName: 'number', confidence: 1.0 };
+
+      case 'void':
+        // void always returns undefined
+        return { typeName: 'undefined', confidence: 1.0 };
+
+      case 'delete':
+        // delete returns boolean
+        return { typeName: 'boolean', confidence: 1.0 };
+
+      default:
+        return { typeName: 'any', confidence: 0.3 };
+    }
+  }
+
+  /**
+   * Infer type from conditional (ternary) expression
+   */
+  private inferConditionalExpressionType(node: t.ConditionalExpression): InferredType {
+    // Infer types for both branches
+    const consequentType = this.inferTypeFromNode(node.consequent);
+    const alternateType = this.inferTypeFromNode(node.alternate);
+
+    // If we couldn't infer either type, return any
+    if (!consequentType || !alternateType) {
+      return { typeName: 'any', confidence: 0.3 };
+    }
+
+    // If both branches have the same type, return that type
+    if (consequentType.typeName === alternateType.typeName) {
+      return {
+        typeName: consequentType.typeName,
+        confidence: Math.min(consequentType.confidence, alternateType.confidence) * 0.95
+      };
+    }
+
+    // Different types - return any as a fallback
+    // In the future, we could return union types like "string | number"
+    return { typeName: 'any', confidence: 0.5 };
   }
 }

@@ -261,22 +261,37 @@ export class TypeResolver implements ITypeResolver {
    */
   private inferMethodReturnType(objType: string, methodName: string): InferredType | null {
     if (objType === 'string') {
-      if (['split'].includes(methodName)) return { typeName: 'string[]', confidence: 0.9 };
+      // Methods that return string[]
+      if (['split'].includes(methodName)) {
+        return { typeName: 'string[]', confidence: 0.9 };
+      }
+      // Methods that return number
       if (['indexOf', 'lastIndexOf', 'search', 'charCodeAt'].includes(methodName)) {
         return { typeName: 'number', confidence: 0.9 };
       }
+      // Methods that return boolean
+      if (['startsWith', 'endsWith', 'includes'].includes(methodName)) {
+        return { typeName: 'boolean', confidence: 0.9 };
+      }
+      // All other string methods return string
       return { typeName: 'string', confidence: 0.9 };
     }
 
     if (objType.includes('[]')) {
-      if (['map', 'filter', 'slice', 'concat'].includes(methodName)) {
+      // Methods that return the same array type
+      if (['map', 'filter', 'slice', 'concat', 'reverse', 'sort', 'flat'].includes(methodName)) {
         return { typeName: objType, confidence: 0.9 };
       }
-      if (['join'].includes(methodName)) return { typeName: 'string', confidence: 0.9 };
+      // Methods that return string
+      if (['join'].includes(methodName)) {
+        return { typeName: 'string', confidence: 0.9 };
+      }
+      // Methods that return boolean
       if (['every', 'some', 'includes'].includes(methodName)) {
         return { typeName: 'boolean', confidence: 0.9 };
       }
-      if (['indexOf', 'findIndex'].includes(methodName)) {
+      // Methods that return number
+      if (['indexOf', 'findIndex', 'push', 'unshift'].includes(methodName)) {
         return { typeName: 'number', confidence: 0.9 };
       }
     }
@@ -326,6 +341,8 @@ export class TypeResolver implements ITypeResolver {
         return { typeName: 'boolean', confidence: 1.0 };
       case 'NullLiteral':
         return { typeName: 'null', confidence: 1.0 };
+      case 'TemplateLiteral':
+        return { typeName: 'string', confidence: 1.0 };
       case 'ArrayExpression':
         return this.inferArrayType(node, typeMap, depth);
       case 'ObjectExpression':
@@ -343,6 +360,10 @@ export class TypeResolver implements ITypeResolver {
         return typeMap.get(node.name) || { typeName: 'any', confidence: 0.1 };
       case 'BinaryExpression':
         return this.inferBinaryExpressionType(node, typeMap, depth);
+      case 'UnaryExpression':
+        return this.inferUnaryExpressionType(node as t.UnaryExpression);
+      case 'ConditionalExpression':
+        return this.inferConditionalExpressionType(node as t.ConditionalExpression, typeMap, depth);
       default:
         return { typeName: 'any', confidence: 0.1 };
     }
@@ -406,6 +427,68 @@ export class TypeResolver implements ITypeResolver {
     }
 
     return { typeName: 'any', confidence: 0.3 };
+  }
+
+  /**
+   * Infer type from unary expression
+   */
+  private inferUnaryExpressionType(node: t.UnaryExpression): InferredType {
+    switch (node.operator) {
+      case '!':
+        // Logical NOT always returns boolean
+        return { typeName: 'boolean', confidence: 1.0 };
+
+      case 'typeof':
+        // typeof always returns string
+        return { typeName: 'string', confidence: 1.0 };
+
+      case '+':
+      case '-':
+      case '~':
+        // Unary +, -, and bitwise NOT return number
+        return { typeName: 'number', confidence: 1.0 };
+
+      case 'void':
+        // void always returns undefined
+        return { typeName: 'undefined', confidence: 1.0 };
+
+      case 'delete':
+        // delete returns boolean
+        return { typeName: 'boolean', confidence: 1.0 };
+
+      default:
+        return { typeName: 'any', confidence: 0.3 };
+    }
+  }
+
+  /**
+   * Infer type from conditional (ternary) expression
+   */
+  private inferConditionalExpressionType(
+    node: t.ConditionalExpression,
+    typeMap: TypeMap,
+    depth: number
+  ): InferredType {
+    // Infer types for both branches
+    const consequentType = this.inferTypeFromNode(node.consequent, typeMap, depth);
+    const alternateType = this.inferTypeFromNode(node.alternate, typeMap, depth);
+
+    // If we couldn't infer either type, return any
+    if (!consequentType || !alternateType) {
+      return { typeName: 'any', confidence: 0.3 };
+    }
+
+    // If both branches have the same type, return that type
+    if (consequentType.typeName === alternateType.typeName) {
+      return {
+        typeName: consequentType.typeName,
+        confidence: Math.min(consequentType.confidence, alternateType.confidence) * 0.95
+      };
+    }
+
+    // Different types - return any as a fallback
+    // In the future, we could return union types like "string | number"
+    return { typeName: 'any', confidence: 0.5 };
   }
 
   /**
