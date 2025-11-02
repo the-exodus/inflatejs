@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { knownTypes } from '../known-types';
 
 describe('knownTypes', () => {

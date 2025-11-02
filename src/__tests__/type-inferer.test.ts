@@ -1,3 +1,4 @@
+import { describe, it, expect, beforeEach } from 'vitest';
 import * as parser from '@babel/parser';
 import { TypeInferer } from '../type-inferer';
 import { TypeMap } from '../types';

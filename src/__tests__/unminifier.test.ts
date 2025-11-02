@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest';
 import { unminify } from '../unminifier-facade';
 
 describe('unminify', () => {

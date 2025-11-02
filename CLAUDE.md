@@ -51,7 +51,7 @@ node dist/index.js <input-file> [output-file] [options]
 ```bash
 npm test
 ```
-Runs all unit and integration tests using Jest.
+Runs all unit and integration tests using vitest.
 
 ```bash
 npm run test:watch
@@ -146,7 +146,7 @@ Command-line interface that uses `UnminificationFactory` to create a configured 
 - **src/known-types.ts**: Standard JavaScript type mappings
 
 ### Tests
-- **src/__tests__/**: Test files (Jest)
+- **src/__tests__/**: Test files (vitest)
   - **known-types.test.ts**: Tests for known-types.ts (100% coverage)
   - **type-inferer.test.ts**: Tests for type inference system (49 tests)
   - **unminifier.test.ts**: Tests for unminification (48 tests)
@@ -172,7 +172,7 @@ When outputting TypeScript, type annotations are first added as JSDoc comments d
 
 ### Test Framework
 
-The project uses **Jest** with TypeScript support (ts-jest) for all testing. Tests are located in `src/__tests__/` and follow the naming convention `*.test.ts`.
+The project uses **vitest** with TypeScript support (ts-vitest) for all testing. Tests are located in `src/__tests__/` and follow the naming convention `*.test.ts`.
 
 ### Test Structure
 
