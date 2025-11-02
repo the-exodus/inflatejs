@@ -396,9 +396,60 @@ const race = Promise.race([p1, p2]);
 // Expected: race: Promise<number> (or Promise<any>)
 ```
 
+### 17. Context-Aware Method Inference (slice)
+**Impact**: Medium-High (very common method)
+**Effort**: Medium (1-2 hours)
+
+**Why needed**: The `slice()` method exists on both strings and arrays with different return types:
+- `string.slice()` → returns `string`
+- `array.slice()` → returns same array type (e.g., `number[]`)
+
+Currently, `slice()` is excluded from method inference because TypeCollector doesn't track object types during the initial inference pass, making it impossible to distinguish which `slice` is being called.
+
+**Solution approach**: Enhance TypeCollector to track object types during CallExpression inference, allowing it to determine the correct return type based on the callee's object type.
+
+**Examples for tests:**
+```javascript
+// String slice
+const text = "hello world";
+const sliced = text.slice(0, 5);
+// Expected: sliced: string
+
+const text2 = "hello";
+const sub1 = text2.slice(1);
+const sub2 = text2.slice(1, 4);
+// Expected: sub1: string, sub2: string
+
+// Array slice
+const numbers = [1, 2, 3, 4, 5];
+const sliced = numbers.slice(1, 3);
+// Expected: sliced: number[]
+
+const strings = ["a", "b", "c"];
+const partial = strings.slice(0, 2);
+// Expected: partial: string[]
+
+// In ternary expressions (this was the original bug)
+const flag = true;
+const arr = [1, 2, 3];
+const result = flag ? arr.slice(0, 2) : [4, 5];
+// Expected: result: number[]
+
+const text = "hello";
+const result2 = flag ? text.slice(0, 2) : "world";
+// Expected: result2: string
+```
+
+**Implementation notes:**
+- Modify TypeCollector's `inferCallExpressionType` to check object type when methodName is `slice`
+- For `MemberExpression` callees, try to infer the object type first
+- If object type is `string` or contains `string`, return `{ typeName: 'string', confidence: 0.9 }`
+- If object type contains `[]` (array type), return `{ typeName: objectType, confidence: 0.9 }`
+- Fall back to `{ typeName: 'any', confidence: 0.3 }` if object type is unknown
+
 ## Priority 3: Advanced (Lower Impact or Complex)
 
-### 17. Optional Chaining
+### 18. Optional Chaining
 **Impact**: Medium (ES2020 feature)
 **Effort**: High (2 hours - needs careful null handling)
 
@@ -412,7 +463,7 @@ const result = obj?.method?.();
 // Expected: result depends on method return type or undefined
 ```
 
-### 18. Nullish Coalescing
+### 19. Nullish Coalescing
 **Impact**: Low-Medium (ES2020 feature)
 **Effort**: Low (10 minutes)
 
@@ -425,7 +476,7 @@ const port = process.env.PORT ?? 3000;
 // Expected: port: string | number (union type)
 ```
 
-### 19. Class Features
+### 20. Class Features
 **Impact**: Medium
 **Effort**: High (3-4 hours)
 
@@ -483,7 +534,7 @@ class Person {
 // Expected: name getter returns string, setter accepts string
 ```
 
-### 20. Generator Functions
+### 21. Generator Functions
 **Impact**: Low (specialized use)
 **Effort**: High (2 hours)
 
@@ -501,7 +552,7 @@ const first = gen.next();
 // Expected: first: IteratorResult<number>
 ```
 
-### 21. Async Iterators
+### 22. Async Iterators
 **Impact**: Low (advanced feature)
 **Effort**: High (2 hours)
 
@@ -514,7 +565,7 @@ async function* asyncGenerator() {
 // Expected: asyncGenerator: () => AsyncGenerator<number>
 ```
 
-### 22. Symbol and BigInt
+### 23. Symbol and BigInt
 **Impact**: Low (rarely used in minified code)
 **Effort**: Low (5 minutes)
 
@@ -530,7 +581,7 @@ const computed = BigInt(100);
 // Expected: computed: bigint
 ```
 
-### 23. Computed Property Names
+### 24. Computed Property Names
 **Impact**: Low
 **Effort**: Medium (1 hour)
 
@@ -544,7 +595,7 @@ const obj = {
 // Expected: obj: object (limited inference possible)
 ```
 
-### 24. Type Narrowing
+### 25. Type Narrowing
 **Impact**: Medium (important for accuracy)
 **Effort**: Very High (4+ hours - requires control flow analysis)
 
@@ -562,7 +613,7 @@ function process(value) {
 }
 ```
 
-### 25. Callback Type Inference
+### 26. Callback Type Inference
 **Impact**: High (very useful)
 **Effort**: Very High (4+ hours - requires sophisticated analysis)
 
@@ -585,7 +636,7 @@ const lengths = words.map(word => word.length);
 // Expected: word: string, lengths: number[]
 ```
 
-### 26. Chained Method Calls
+### 27. Chained Method Calls
 **Impact**: High (common pattern)
 **Effort**: Medium (current system should handle, may need fixes)
 
@@ -600,7 +651,7 @@ const result = "hello,world,test"
 // Each step: split->string[], map->string[], filter->string[], join->string
 ```
 
-### 27. IndexedAccess / Computed Member Access
+### 28. IndexedAccess / Computed Member Access
 **Impact**: Medium
 **Effort**: Medium (1 hour)
 
@@ -616,7 +667,7 @@ const value = obj[key];
 // Expected: value: any (dynamic access is hard to type)
 ```
 
-### 28. this Context
+### 29. this Context
 **Impact**: Medium
 **Effort**: High (2-3 hours)
 
@@ -631,7 +682,7 @@ const obj = {
 // Expected: getValue should recognize this.value as number
 ```
 
-### 29. Closures with Captured Variables
+### 30. Closures with Captured Variables
 **Impact**: Medium
 **Effort**: Medium (current system might handle, may need verification)
 
@@ -649,7 +700,7 @@ const value = counter();
 // Expected: value: number (if count type is tracked)
 ```
 
-### 30. Union Types from Conditionals
+### 31. Union Types from Conditionals
 **Impact**: Medium (improves accuracy)
 **Effort**: High (2 hours)
 
@@ -669,12 +720,12 @@ function getValue(flag) {
 
 ### By Priority
 - **Priority 1 (Critical)**: 6 items - Quick wins, high impact
-- **Priority 2 (Important)**: 11 items - Medium effort, good ROI
+- **Priority 2 (Important)**: 12 items - Medium effort, good ROI
 - **Priority 3 (Advanced)**: 13 items - Complex or specialized
 
 ### By Effort
 - **Low (< 30 min)**: 12 items
-- **Medium (30 min - 2 hours)**: 11 items
+- **Medium (30 min - 2 hours)**: 12 items
 - **High (2+ hours)**: 7 items
 
 ### Quick Wins (< 1 hour total)
@@ -711,23 +762,24 @@ For each TODO item:
 - Total test count: 256 (up from 181)
 - Coverage improved from ~50% to ~75%+ of common JavaScript patterns
 
-### Phase 2 (2 hours): Common Patterns
+### Phase 2 (2-3 hours): Common Patterns
 5. Logical expressions for values
 6. RegExp literals
 7. Object/Array static methods
 8. Type conversion functions
+9. Context-aware method inference (slice)
 
 ### Phase 3 (3 hours): Modern JavaScript
-9. Default parameters
-10. Rest parameters
-11. Optional chaining
-12. Spread operator
+10. Default parameters
+11. Rest parameters
+12. Optional chaining
+13. Spread operator
 
 ### Phase 4 (4+ hours): Advanced Features
-13. Destructuring
-14. Class features
-15. Callback type inference
-16. Type narrowing
+14. Destructuring
+15. Class features
+16. Callback type inference
+17. Type narrowing
 
 ---
 

@@ -162,6 +162,52 @@ export class TypeCollector implements ITypeCollector {
    * Infer type from call expression
    */
   private inferCallExpressionType(node: t.CallExpression): InferredType {
+    // Handle method calls (obj.method())
+    if (t.isMemberExpression(node.callee)) {
+      if (t.isIdentifier(node.callee.property)) {
+        const methodName = node.callee.property.name;
+
+        // Common string methods that return string (only unambiguous ones)
+        // Note: 'slice' is excluded because it exists on both strings and arrays
+        if (['toUpperCase', 'toLowerCase', 'trim', 'trimStart', 'trimEnd',
+             'substring', 'substr', 'replace', 'replaceAll',
+             'repeat', 'padStart', 'padEnd', 'charAt'].includes(methodName)) {
+          return { typeName: 'string', confidence: 0.9 };
+        }
+
+        // String methods that return string[]
+        if (methodName === 'split') {
+          return { typeName: 'string[]', confidence: 0.9 };
+        }
+
+        // String methods that return number
+        if (['indexOf', 'lastIndexOf', 'search', 'charCodeAt'].includes(methodName)) {
+          return { typeName: 'number', confidence: 0.9 };
+        }
+
+        // String methods that return boolean
+        if (['startsWith', 'endsWith', 'includes'].includes(methodName)) {
+          return { typeName: 'boolean', confidence: 0.9 };
+        }
+
+        // Array methods that return boolean
+        if (['some', 'every', 'includes'].includes(methodName)) {
+          return { typeName: 'boolean', confidence: 0.9 };
+        }
+
+        // Array methods that return number
+        if (['indexOf', 'findIndex', 'push', 'unshift'].includes(methodName)) {
+          return { typeName: 'number', confidence: 0.9 };
+        }
+
+        // Array methods that return string
+        if (methodName === 'join') {
+          return { typeName: 'string', confidence: 0.9 };
+        }
+      }
+    }
+
+    // Handle direct function calls
     if (t.isIdentifier(node.callee)) {
       const calleeName = node.callee.name;
       if (knownTypes.has(calleeName)) {
@@ -171,6 +217,7 @@ export class TypeCollector implements ITypeCollector {
         };
       }
     }
+
     return { typeName: 'any', confidence: 0.3 };
   }
 

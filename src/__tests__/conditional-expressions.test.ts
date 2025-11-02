@@ -71,6 +71,15 @@ describe('Conditional expression type inference', () => {
       expect(result).toContain('const');
     });
 
+    it('should infer string type for ternary with method call on variable', async () => {
+      const code = 'const text="hello";const flag=true;const result=flag?text.toUpperCase():"world";';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      // This was previously failing (returned 'any' with confidence 0.5)
+      // Now should correctly infer 'string' type
+      expect(result).toMatch(/result:\s*string/);
+    });
+
     it('should infer type from ternary with numeric operations', async () => {
       const code = 'const x=5;const result=x>10?100:200;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
