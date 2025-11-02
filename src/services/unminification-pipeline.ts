@@ -262,8 +262,12 @@ export class UnminificationPipeline implements IUnminificationPipeline {
           return match;
         }
 
-        // Skip if it looks like it's part of a for loop or other control structure
-        // by checking if the line before contains 'for', 'while', 'if', etc.
+        // Skip if it's a control structure keyword
+        const controlKeywords = ['if', 'while', 'for', 'switch', 'catch', 'with'];
+        if (controlKeywords.includes(methodName)) {
+          return match;
+        }
+
         const params = paramsStr
           .split(',')
           .map((p: string) => p.trim())
@@ -305,6 +309,22 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         return `class ${className} {${propertyDeclarations ? '\n' + propertyDeclarations : ''}${spacing}constructor(${typedParams}) {${constructorBody}}`;
       }
     );
+
+    // Add type annotations to variable declarations when we have type information
+    if (typeMap) {
+      // Match: const/let/var variableName = ...
+      tsCode = tsCode.replace(
+        /^(\s*)(const|let|var)\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=/gm,
+        (match, indent, keyword, varName) => {
+          const varType = typeMap.get(varName);
+          // Only add annotation if we have a type with good confidence and it's not 'any'
+          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any') {
+            return `${indent}${keyword} ${varName}: ${varType.typeName} =`;
+          }
+          return match;
+        }
+      );
+    }
 
     // Final cleanup: Remove any erroneous `: any` after increment/decrement operators
     tsCode = tsCode.replace(/(\+\+|--)\s*:\s*any/g, '$1');

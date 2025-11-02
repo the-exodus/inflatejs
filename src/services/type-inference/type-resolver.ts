@@ -118,7 +118,7 @@ export class TypeResolver implements ITypeResolver {
     let returnType: InferredType = { typeName: 'void', confidence: 0.5 };
     let hasExplicitReturn = false;
 
-    // Traverse return statements
+    // Traverse return statements (but don't enter nested functions)
     funcInfo.path.traverse({
       ReturnStatement: (returnPath: any) => {
         hasExplicitReturn = true;
@@ -131,10 +131,23 @@ export class TypeResolver implements ITypeResolver {
             new Set(visited)
           );
 
-          if (argType && argType.confidence > returnType.confidence) {
+          if (argType && argType.confidence >= returnType.confidence) {
             returnType = argType;
           }
         }
+      },
+      // Stop traversal at nested functions
+      FunctionDeclaration: (path: any) => {
+        // Skip if this is the function itself
+        if (path.node !== funcInfo.path.node) {
+          path.skip();
+        }
+      },
+      FunctionExpression: (path: any) => {
+        path.skip();
+      },
+      ArrowFunctionExpression: (path: any) => {
+        path.skip();
       }
     });
 
@@ -177,6 +190,25 @@ export class TypeResolver implements ITypeResolver {
 
     if (this.config.maxTime && Date.now() - this.startTime > this.config.maxTime) {
       return this.inferTypeFromNode(node, typeMap, depth);
+    }
+
+    // Handle identifiers that refer to functions (not function calls)
+    // This ensures we get the full function type, not just the return type
+    if (t.isIdentifier(node)) {
+      const funcInfo = callGraph.functions.get(node.name);
+      if (funcInfo && !visited.has(node.name)) {
+        // This is a reference to a function (not a call), so we need to ensure
+        // the function has been analyzed and return its full type signature
+        this.inferFunctionReturnType(
+          funcInfo,
+          typeMap,
+          callGraph,
+          depth + 1,
+          visited
+        );
+        // Return the full function type from typeMap
+        return typeMap.get(node.name) || { typeName: 'any', confidence: 0.1 };
+      }
     }
 
     // Handle call expressions
@@ -263,9 +295,11 @@ export class TypeResolver implements ITypeResolver {
         return { typeName: 'object', confidence: 0.8 };
       case 'FunctionExpression':
       case 'ArrowFunctionExpression':
-        return { typeName: 'Function', confidence: 0.9 };
+        return this.inferFunctionExpressionType(node as any, typeMap, depth);
       case 'CallExpression':
         return this.inferCallType(node, typeMap);
+      case 'AwaitExpression':
+        return this.inferAwaitType(node as t.AwaitExpression, typeMap, depth);
       case 'Identifier':
         return typeMap.get(node.name) || { typeName: 'any', confidence: 0.1 };
       case 'BinaryExpression':
@@ -443,6 +477,63 @@ export class TypeResolver implements ITypeResolver {
         typeMap.set(name, inferredType);
       }
     }
+  }
+
+  /**
+   * Infer type from await expression (unwrap Promise)
+   */
+  private inferAwaitType(node: t.AwaitExpression, typeMap: TypeMap, depth: number): InferredType | null {
+    const argType = this.inferTypeFromNode(node.argument, typeMap, depth);
+    if (!argType) return { typeName: 'any', confidence: 0.1 };
+
+    // Unwrap Promise<T> to T
+    const promiseMatch = argType.typeName.match(/^Promise<(.+)>$/);
+    if (promiseMatch) {
+      return { typeName: promiseMatch[1], confidence: argType.confidence * 0.9 };
+    }
+
+    // If it's not a Promise type, return as-is (might be 'any' or unknown)
+    return argType;
+  }
+
+  /**
+   * Infer type from function expression
+   * Returns the function type itself, not what it returns
+   */
+  private inferFunctionExpressionType(
+    node: t.FunctionExpression | t.ArrowFunctionExpression,
+    typeMap: TypeMap,
+    depth: number
+  ): InferredType {
+    // Get parameter types
+    const paramTypes = node.params.map(param => {
+      if (t.isIdentifier(param)) {
+        const type = typeMap.get(param.name);
+        return type ? type.typeName : 'any';
+      }
+      return 'any';
+    });
+
+    // Try to infer return type from the function body
+    let returnType: InferredType = { typeName: 'any', confidence: 0.5 };
+
+    if (t.isBlockStatement(node.body)) {
+      // Look for return statements
+      for (const stmt of node.body.body) {
+        if (t.isReturnStatement(stmt) && stmt.argument) {
+          const argType = this.inferTypeFromNode(stmt.argument, typeMap, depth + 1);
+          if (argType && argType.confidence > returnType.confidence) {
+            returnType = argType;
+          }
+        }
+      }
+    } else {
+      // Arrow function with expression body
+      returnType = this.inferTypeFromNode(node.body, typeMap, depth + 1) || returnType;
+    }
+
+    const typeStr = `(${paramTypes.join(', ')}) => ${returnType.typeName}`;
+    return { typeName: typeStr, confidence: 0.8 };
   }
 
   /**

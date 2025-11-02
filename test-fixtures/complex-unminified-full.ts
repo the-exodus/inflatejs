@@ -19,7 +19,7 @@ function h(param2: any) {
 }
 function l(param5: number[]): number {
   let variable6 = 0;
-  for(let variable7 = 0; variable7 < param5.length; variable7++) {
+  for (let variable7 = 0; variable7 < param5.length; variable7++) {
     variable6 += param5[variable7];
   }
   return variable6;
@@ -51,7 +51,7 @@ class v {
     return this.w * a1;
   }
 }
-function b1(param9: number): number {
+function b1(param9: number): (any) => number {
   let variable9 = 0;
   function e1(param10: any): number {
     variable9 += param10;
@@ -88,7 +88,7 @@ function v1(param12: any) {
 }
 const variable20 = v1([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 function b2(param16: number, value4: number): number {
-  if(param16 > value4: any) {
+  if (param16 > value4) {
     return param16 - value4;
   } else if (param16 < value4) {
     return value4 - param16;
@@ -115,7 +115,7 @@ function i2(param17: string): number {
 const variable27 = i2("JavaScript");
 function o2(param18: any, value5: any) {
   return new Promise((param19: any, value6: any) => {
-    if(param18 > 0: any) {
+    if (param18 > 0) {
       param19(param18 * value5);
     } else {
       value6("Invalid number");
