@@ -83,11 +83,18 @@ const level = score > 90 ? "A" : score > 80 ? "B" : "C";
 // Expected: level: string
 ```
 
-### 4. Logical Expressions (Value Usage)
+### 4. Logical Expressions (Value Usage) ✅ COMPLETED
 **Impact**: High (common for defaults)
 **Effort**: Medium (20 minutes)
 
-`||` and `&&` used for values, not just booleans.
+~~`||` and `&&` used for values, not just booleans.~~
+**Status**: Implemented and tested (30 tests passing)
+
+**Implementation notes**:
+- Supports `||`, `&&`, and `??` operators
+- Infers common type when both operands have the same type
+- Returns `any` with low confidence when operand types differ
+- Known limitation: Identifier resolution during initial collection may result in lower confidence scores for expressions referencing variables
 
 **Examples for tests:**
 ```javascript
@@ -396,7 +403,108 @@ const race = Promise.race([p1, p2]);
 // Expected: race: Promise<number> (or Promise<any>)
 ```
 
-### 17. Context-Aware Method Inference (slice)
+### 17. Union Type Inference
+**Impact**: High (improves type accuracy significantly)
+**Effort**: Medium (1-2 hours)
+
+**Why needed**: Currently, when conditional expressions, logical expressions, or function return statements have different types, the system falls back to `any` with low confidence. Union types would preserve type information and improve accuracy.
+
+**Current limitations addressed:**
+- Conditional expressions: `flag ? "text" : 42` → currently `any`, should be `string | number`
+- Logical expressions: `userInput || 0` → currently `any` if types differ, should be `string | number`
+- Function returns: Multiple return statements with different types → should infer union type
+
+**Solution approach**:
+1. Detect when types differ but both have high confidence (≥0.7)
+2. Create union type syntax: `type1 | type2`
+3. Handle simplification: `string | string` → `string`
+4. Handle nested unions: `(string | number) | boolean` → `string | number | boolean`
+5. Limit union complexity: max 3-4 types, otherwise fall back to `any`
+
+**Examples for tests:**
+```javascript
+// Conditional with different types
+const flag = true;
+const result = flag ? "success" : 404;
+// Expected: result: string | number
+
+const value = condition ? true : false;
+// Expected: value: boolean (simplified from boolean | boolean)
+
+// Logical OR with different types
+const input = getUserInput(); // returns string | undefined
+const value = input || 0;
+// Expected: value: string | number (from string | undefined | number)
+
+const port = process.env.PORT || 3000;
+// Expected: port: string | number
+
+// Logical AND with different types
+const flag = true;
+const result = flag && "done";
+// Expected: result: boolean | string
+
+// Function with multiple return types
+function getValue(flag) {
+  if (flag) {
+    return "text";
+  } else {
+    return 42;
+  }
+}
+// Expected: getValue: (any) => string | number
+
+function process(x) {
+  if (x > 0) return x;
+  if (x < 0) return "negative";
+  return null;
+}
+// Expected: process: (any) => number | string | null
+
+// Nested ternary with different types
+const level = score > 90 ? "A" : score > 70 ? "B" : 0;
+// Expected: level: string | number
+
+// Complex union simplification
+const a = flag1 ? "x" : "y";  // string
+const b = flag2 ? a : "z";     // string (all branches are string)
+// Expected: b: string
+
+const c = flag3 ? "hello" : 123;  // string | number
+const d = flag4 ? c : true;        // string | number | boolean
+// Expected: d: string | number | boolean
+
+// Array element unions
+const mixed = flag ? [1, 2, 3] : ["a", "b"];
+// Expected: mixed: number[] | string[]
+
+// Object union (if feasible)
+const obj = flag ? { x: 1 } : { y: "text" };
+// Expected: obj: object (union of object shapes is complex)
+
+// Union in type propagation
+const value = condition ? "text" : 42;
+const copied = value;
+// Expected: value: string | number, copied: string | number
+
+const doubled = value * 2; // Only works with number part
+// Note: This would require type narrowing, which is a separate feature
+```
+
+**Implementation notes:**
+- Modify `inferConditionalExpressionType` and `inferLogicalExpressionType` to create union types
+- Add utility function `createUnionType(type1: InferredType, type2: InferredType): InferredType`
+- Handle union type simplification and deduplication
+- Update confidence scoring: use minimum confidence of constituent types * 0.9
+- Limit union complexity to prevent `string | number | boolean | object | ...` becoming unwieldy
+- Document that type narrowing (using unions correctly in operations) is a separate future enhancement
+
+**Related improvements this enables:**
+- Better function return type inference (item #30: Union Types from Conditionals)
+- More accurate logical expression types (item #4: already implemented, would be enhanced)
+- Improved conditional expression types (item #3: already implemented, would be enhanced)
+
+### 18. Context-Aware Method Inference (slice)
 **Impact**: Medium-High (very common method)
 **Effort**: Medium (1-2 hours)
 
@@ -449,7 +557,7 @@ const result2 = flag ? text.slice(0, 2) : "world";
 
 ## Priority 3: Advanced (Lower Impact or Complex)
 
-### 18. Optional Chaining
+### 19. Optional Chaining
 **Impact**: Medium (ES2020 feature)
 **Effort**: High (2 hours - needs careful null handling)
 
@@ -463,7 +571,7 @@ const result = obj?.method?.();
 // Expected: result depends on method return type or undefined
 ```
 
-### 19. Nullish Coalescing
+### 20. Nullish Coalescing
 **Impact**: Low-Medium (ES2020 feature)
 **Effort**: Low (10 minutes)
 
@@ -476,7 +584,7 @@ const port = process.env.PORT ?? 3000;
 // Expected: port: string | number (union type)
 ```
 
-### 20. Class Features
+### 21. Class Features
 **Impact**: Medium
 **Effort**: High (3-4 hours)
 
@@ -534,7 +642,7 @@ class Person {
 // Expected: name getter returns string, setter accepts string
 ```
 
-### 21. Generator Functions
+### 22. Generator Functions
 **Impact**: Low (specialized use)
 **Effort**: High (2 hours)
 
@@ -552,7 +660,7 @@ const first = gen.next();
 // Expected: first: IteratorResult<number>
 ```
 
-### 22. Async Iterators
+### 23. Async Iterators
 **Impact**: Low (advanced feature)
 **Effort**: High (2 hours)
 
@@ -565,7 +673,7 @@ async function* asyncGenerator() {
 // Expected: asyncGenerator: () => AsyncGenerator<number>
 ```
 
-### 23. Symbol and BigInt
+### 24. Symbol and BigInt
 **Impact**: Low (rarely used in minified code)
 **Effort**: Low (5 minutes)
 
@@ -581,7 +689,7 @@ const computed = BigInt(100);
 // Expected: computed: bigint
 ```
 
-### 24. Computed Property Names
+### 25. Computed Property Names
 **Impact**: Low
 **Effort**: Medium (1 hour)
 
@@ -595,7 +703,7 @@ const obj = {
 // Expected: obj: object (limited inference possible)
 ```
 
-### 25. Type Narrowing
+### 26. Type Narrowing
 **Impact**: Medium (important for accuracy)
 **Effort**: Very High (4+ hours - requires control flow analysis)
 
@@ -613,7 +721,7 @@ function process(value) {
 }
 ```
 
-### 26. Callback Type Inference
+### 27. Callback Type Inference
 **Impact**: High (very useful)
 **Effort**: Very High (4+ hours - requires sophisticated analysis)
 
@@ -636,7 +744,7 @@ const lengths = words.map(word => word.length);
 // Expected: word: string, lengths: number[]
 ```
 
-### 27. Chained Method Calls
+### 28. Chained Method Calls
 **Impact**: High (common pattern)
 **Effort**: Medium (current system should handle, may need fixes)
 
@@ -651,7 +759,7 @@ const result = "hello,world,test"
 // Each step: split->string[], map->string[], filter->string[], join->string
 ```
 
-### 28. IndexedAccess / Computed Member Access
+### 29. IndexedAccess / Computed Member Access
 **Impact**: Medium
 **Effort**: Medium (1 hour)
 
@@ -667,7 +775,7 @@ const value = obj[key];
 // Expected: value: any (dynamic access is hard to type)
 ```
 
-### 29. this Context
+### 30. this Context
 **Impact**: Medium
 **Effort**: High (2-3 hours)
 
@@ -682,7 +790,7 @@ const obj = {
 // Expected: getValue should recognize this.value as number
 ```
 
-### 30. Closures with Captured Variables
+### 31. Closures with Captured Variables
 **Impact**: Medium
 **Effort**: Medium (current system might handle, may need verification)
 
@@ -700,9 +808,11 @@ const value = counter();
 // Expected: value: number (if count type is tracked)
 ```
 
-### 31. Union Types from Conditionals
+### 32. Union Types from Conditionals
 **Impact**: Medium (improves accuracy)
 **Effort**: High (2 hours)
+
+**Note**: This item is superseded by **Item #17: Union Type Inference**, which provides a more comprehensive solution for union types in conditionals, logical expressions, and function returns.
 
 **Examples for tests:**
 ```javascript
@@ -720,12 +830,12 @@ function getValue(flag) {
 
 ### By Priority
 - **Priority 1 (Critical)**: 6 items - Quick wins, high impact
-- **Priority 2 (Important)**: 12 items - Medium effort, good ROI
+- **Priority 2 (Important)**: 13 items - Medium effort, good ROI
 - **Priority 3 (Advanced)**: 13 items - Complex or specialized
 
 ### By Effort
 - **Low (< 30 min)**: 12 items
-- **Medium (30 min - 2 hours)**: 12 items
+- **Medium (30 min - 2 hours)**: 13 items
 - **High (2+ hours)**: 7 items
 
 ### Quick Wins (< 1 hour total)
@@ -762,24 +872,29 @@ For each TODO item:
 - Total test count: 256 (up from 181)
 - Coverage improved from ~50% to ~75%+ of common JavaScript patterns
 
+### Phase 2 Progress
+- Item 5 (Logical expressions): Added 30 new tests (all passing) ✅
+- Total test count: 287 (up from 256)
+
 ### Phase 2 (2-3 hours): Common Patterns
-5. Logical expressions for values
+5. Logical expressions for values ✅
 6. RegExp literals
 7. Object/Array static methods
 8. Type conversion functions
-9. Context-aware method inference (slice)
+9. Union type inference
+10. Context-aware method inference (slice)
 
 ### Phase 3 (3 hours): Modern JavaScript
-10. Default parameters
-11. Rest parameters
-12. Optional chaining
-13. Spread operator
+11. Default parameters
+12. Rest parameters
+13. Optional chaining
+14. Spread operator
 
 ### Phase 4 (4+ hours): Advanced Features
-14. Destructuring
-15. Class features
-16. Callback type inference
-17. Type narrowing
+15. Destructuring
+16. Class features
+17. Callback type inference
+18. Type narrowing
 
 ---
 

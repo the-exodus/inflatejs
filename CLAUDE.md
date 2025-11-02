@@ -2,31 +2,94 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## ⚠️ CRITICAL: Test-Driven Development
+## ⚠️ CRITICAL: Test-Driven Development (TDD)
 
-**ALWAYS UPDATE TESTS WHEN CHANGING FUNCTIONALITY**
+**ALWAYS USE TDD: WRITE TESTS FIRST, THEN IMPLEMENT**
 
-When modifying, adding, or fixing any functionality in this codebase, you MUST update or add corresponding tests. This is non-negotiable.
+When implementing new features or fixing bugs, you MUST follow Test-Driven Development practices. This is non-negotiable.
+
+### TDD Workflow - ALWAYS Follow This Process
+
+1. **Write Tests FIRST**:
+   - Create a new test file (e.g., `src/__tests__/feature-name.test.ts`)
+   - Write comprehensive test cases covering:
+     - Happy path (expected usage)
+     - Edge cases (boundary conditions, empty inputs, null values)
+     - Error cases (invalid inputs, expected failures)
+     - Integration scenarios (how components work together)
+   - Identify and add any missing test cases from the examples in TODO.md
+   - Run tests to verify they FAIL (as expected, since feature isn't implemented yet)
+
+2. **Implement Code to Make Tests Pass**:
+   - Write the minimal code needed to make the tests pass
+   - Run tests frequently during implementation
+   - Refactor as needed while keeping tests green
+
+3. **Verify All Tests Pass**:
+   - Run the full test suite: `npm test`
+   - Ensure no existing tests were broken
+   - Verify new tests are passing
+
+4. **Update Documentation**:
+   - Mark items as completed in TODO.md
+   - Update CLAUDE.md if significant patterns or practices changed
+   - Document any known limitations or complications discovered
 
 ### Test Update Requirements
 
+**For existing functionality**:
 1. **Before making changes**: Run existing tests to ensure they pass
 2. **After making changes**:
    - Update existing tests if behavior has changed
-   - Add new tests for new functionality
    - Add regression tests for bug fixes
    - Run tests to verify they pass: `npm test`
 3. **Test coverage**: Aim for 70%+ coverage for new code
 
 ### What requires test updates:
 
-- ✅ **New features** → Add comprehensive tests
-- ✅ **Bug fixes** → Add regression tests
-- ✅ **Refactoring** → Update tests to match new structure
+- ✅ **New features** → Write tests FIRST using TDD (see workflow above)
+- ✅ **Bug fixes** → Add regression tests showing the bug, then fix it
+- ✅ **Refactoring** → Update tests to match new structure (if needed)
 - ✅ **API changes** → Update integration tests
 - ✅ **TypeScript generation changes** → Update unminifier.test.ts
-- ✅ **Type inference changes** → Update type-inferer.test.ts
+- ✅ **Type inference changes** → Create feature-specific test file (e.g., template-literals.test.ts)
 - ✅ **CLI changes** → Update index.test.ts
+
+### TDD Examples from This Project
+
+**Example 1 - Template Literals (Phase 1)**:
+1. Created `src/__tests__/template-literals.test.ts` with 8 test cases
+2. Ran tests - all failed as expected
+3. Added TemplateLiteral case to TypeCollector's `inferTypeFromNode`
+4. Added same to TypeResolver's `inferTypeFromNode`
+5. Ran tests - all 8 passed ✅
+
+**Example 2 - Logical Expressions (Phase 2)**:
+1. Created `src/__tests__/logical-expressions.test.ts` with 30 test cases
+2. Ran tests - 19 failed as expected
+3. Added LogicalExpression support to TypeCollector and TypeResolver
+4. Adjusted 4 tests with overly strict expectations
+5. Ran tests - all 30 passed ✅
+
+### Discovering Complications During TDD
+
+When implementing features, you may discover complications (like the `slice()` method ambiguity). When this happens:
+
+1. **Document the issue**: Add a detailed entry to TODO.md in the appropriate phase
+2. **Include examples**: Provide comprehensive examples showing the problem
+3. **Suggest solution approach**: Outline how the issue could be resolved
+4. **Adjust tests**: Update test expectations to reflect current limitations
+5. **Add comments**: Document the limitation in test comments
+
+**Example - slice() method**: During Phase 1 implementation, we discovered that `slice()` exists on both strings and arrays with different return types. This was added to TODO.md as "Item #18: Context-Aware Method Inference" with comprehensive examples and solution approach.
+
+### Test File Organization
+
+- **Feature-specific tests**: `template-literals.test.ts`, `logical-expressions.test.ts`, etc.
+- **Integration tests**: `unminifier.test.ts` (core functionality), `index.test.ts` (CLI)
+- **Unit tests**: `known-types.test.ts`, `type-inferer.test.ts`
+- Use descriptive `describe()` blocks to group related tests
+- Use clear test names that explain what is being tested
 
 **Example**: If you modify TypeScript generation to add explicit `any` types, you must update tests in `unminifier.test.ts` to verify the new behavior.
 

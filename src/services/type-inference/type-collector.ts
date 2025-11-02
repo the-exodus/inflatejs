@@ -123,6 +123,8 @@ export class TypeCollector implements ITypeCollector {
         return this.inferUnaryExpressionType(node);
       case 'ConditionalExpression':
         return this.inferConditionalExpressionType(node);
+      case 'LogicalExpression':
+        return this.inferLogicalExpressionType(node);
       default:
         return { typeName: 'any', confidence: 0.1 };
     }
@@ -306,6 +308,33 @@ export class TypeCollector implements ITypeCollector {
       return {
         typeName: consequentType.typeName,
         confidence: Math.min(consequentType.confidence, alternateType.confidence) * 0.95
+      };
+    }
+
+    // Different types - return any as a fallback
+    // In the future, we could return union types like "string | number"
+    return { typeName: 'any', confidence: 0.5 };
+  }
+
+  /**
+   * Infer type from logical expression (||, &&, ??)
+   */
+  private inferLogicalExpressionType(node: t.LogicalExpression): InferredType {
+    // Infer types for both operands
+    const leftType = this.inferTypeFromNode(node.left);
+    const rightType = this.inferTypeFromNode(node.right);
+
+    // If we couldn't infer either type, return any
+    if (!leftType || !rightType) {
+      return { typeName: 'any', confidence: 0.3 };
+    }
+
+    // If both operands have the same type, return that type
+    // This works for ||, &&, and ?? operators
+    if (leftType.typeName === rightType.typeName) {
+      return {
+        typeName: leftType.typeName,
+        confidence: Math.min(leftType.confidence, rightType.confidence) * 0.95
       };
     }
 
