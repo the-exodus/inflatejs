@@ -19,7 +19,7 @@ function h(param2: any) {
 }
 function l(param5: number[]): number {
   let variable6 = 0;
-  for(let variable7 = 0; variable7 < param5.length; variable7++: any) {
+  for(let variable7 = 0; variable7 < param5.length; variable7++) {
     variable6 += param5[variable7];
   }
   return variable6;

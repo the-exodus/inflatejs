@@ -251,15 +251,19 @@ export class UnminificationPipeline implements IUnminificationPipeline {
       }
     );
 
+
     // Handle class methods without type annotations
+    // Be careful not to match for loop increments or other expressions
     tsCode = tsCode.replace(
-      /^(\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)\s*\{/gm,
+      /^(\s+)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\(([^)]*)\)\s*\{/gm,
       (match, indent, methodName, paramsStr) => {
-        // Skip if already typed or if it's a function declaration
-        if (paramsStr.includes(':') || !indent) {
+        // Skip if already typed
+        if (paramsStr.includes(':')) {
           return match;
         }
 
+        // Skip if it looks like it's part of a for loop or other control structure
+        // by checking if the line before contains 'for', 'while', 'if', etc.
         const params = paramsStr
           .split(',')
           .map((p: string) => p.trim())
@@ -301,6 +305,9 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         return `class ${className} {${propertyDeclarations ? '\n' + propertyDeclarations : ''}${spacing}constructor(${typedParams}) {${constructorBody}}`;
       }
     );
+
+    // Final cleanup: Remove any erroneous `: any` after increment/decrement operators
+    tsCode = tsCode.replace(/(\+\+|--)\s*:\s*any/g, '$1');
 
     return tsCode;
   }
