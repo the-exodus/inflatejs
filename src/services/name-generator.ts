@@ -11,7 +11,7 @@ export class NameGenerator implements INameGenerator {
 
   // Base names for different contexts
   private readonly parameterNames = ['param', 'value', 'item', 'element', 'data'];
-  private readonly variableNames = ['var', 'temp', 'result', 'obj', 'arr'];
+  private readonly variableNames = ['variable', 'temp', 'result', 'obj', 'arr'];
 
   /**
    * Generate a meaningful name based on context

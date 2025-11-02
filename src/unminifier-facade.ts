@@ -21,20 +21,25 @@ export interface UnminifyOptions {
  *
  * @param code - The minified JavaScript code
  * @param options - Unminification options
- * @returns Unminified and formatted code
+ * @returns Promise that resolves to unminified and formatted code
  */
-export function unminify(code: string, options: UnminifyOptions = {}): string {
-  // Support both outputTypeScript and outputFormat for backward compatibility
-  const outputTypeScript = options.outputTypeScript ?? (options.outputFormat === 'ts');
+export async function unminify(code: string, options: UnminifyOptions = {}): Promise<string> {
+  try {
+    // Support both outputTypeScript and outputFormat for backward compatibility
+    const outputTypeScript = options.outputTypeScript ?? (options.outputFormat === 'ts');
 
-  const config: UnminificationConfig = {
-    renameVariables: options.renameVariables ?? true,
-    inferTypes: options.inferTypes ?? false,
-    outputTypeScript,
-    maxDepth: 8,
-    maxTime: 5000
-  };
+    const config: UnminificationConfig = {
+      renameVariables: options.renameVariables ?? true,
+      inferTypes: options.inferTypes ?? false,
+      outputTypeScript,
+      maxDepth: 8,
+      maxTime: 5000
+    };
 
-  const pipeline = UnminificationFactory.createPipeline(config);
-  return pipeline.process(code, config);
+    const pipeline = UnminificationFactory.createPipeline(config);
+    return pipeline.process(code, config);
+  } catch (error) {
+    // Re-throw to return a rejected promise
+    throw error;
+  }
 }

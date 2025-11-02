@@ -32,6 +32,21 @@ export class ASTTransformer implements IASTTransformer {
    */
   private renameIdentifiers(ast: t.File, scopeManager: IScopeManager): void {
     traverse(ast, {
+      VariableDeclarator: (path) => {
+        if (t.isIdentifier(path.node.id)) {
+          const scopeId = path.scope.uid.toString();
+          const originalName = path.node.id.name;
+          const newName = scopeManager.getOrCreateMapping(originalName, scopeId, {
+            isParameter: false,
+            scope: scopeId
+          });
+
+          if (newName !== originalName) {
+            path.scope.rename(originalName, newName);
+          }
+        }
+      },
+
       FunctionDeclaration: (path) => {
         if (!path.node.id) return;
 
