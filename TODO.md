@@ -290,11 +290,18 @@ function increment(x, delta = 1) {
 // Expected: increment: (any, number?) => number
 ```
 
-### 11. RegExp Literals
+### 11. RegExp Literals ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low (5 minutes)
 
-Regular expression literals should be typed as `RegExp`.
+~~Regular expression literals should be typed as `RegExp`.~~
+**Status**: Implemented and tested (28 tests passing)
+
+**Implementation notes**:
+- Added RegExpLiteral support to both TypeCollector and TypeResolver
+- Added RegExp method inference: `test()` returns `boolean`
+- Supports all RegExp patterns, flags, and edge cases
+- Works correctly in ternary expressions, logical expressions, arrays, and type propagation
 
 **Examples for tests:**
 ```javascript
@@ -874,11 +881,12 @@ For each TODO item:
 
 ### Phase 2 Progress
 - Item 5 (Logical expressions): Added 30 new tests (all passing) ✅
-- Total test count: 287 (up from 256)
+- Item 6 (RegExp literals): Added 28 new tests (all passing) ✅
+- Total test count: 315 (up from 287)
 
 ### Phase 2 (2-3 hours): Common Patterns
 5. Logical expressions for values ✅
-6. RegExp literals
+6. RegExp literals ✅
 7. Object/Array static methods
 8. Type conversion functions
 9. Union type inference

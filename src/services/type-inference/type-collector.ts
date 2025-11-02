@@ -108,6 +108,8 @@ export class TypeCollector implements ITypeCollector {
         return { typeName: 'null', confidence: 1.0 };
       case 'TemplateLiteral':
         return { typeName: 'string', confidence: 1.0 };
+      case 'RegExpLiteral':
+        return { typeName: 'RegExp', confidence: 1.0 };
       case 'ArrayExpression':
         return this.inferArrayType(node);
       case 'ObjectExpression':
@@ -205,6 +207,11 @@ export class TypeCollector implements ITypeCollector {
         // Array methods that return string
         if (methodName === 'join') {
           return { typeName: 'string', confidence: 0.9 };
+        }
+
+        // RegExp methods that return boolean
+        if (methodName === 'test') {
+          return { typeName: 'boolean', confidence: 0.9 };
         }
       }
     }

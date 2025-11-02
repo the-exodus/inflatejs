@@ -296,6 +296,13 @@ export class TypeResolver implements ITypeResolver {
       }
     }
 
+    if (objType === 'RegExp') {
+      // Methods that return boolean
+      if (methodName === 'test') {
+        return { typeName: 'boolean', confidence: 0.9 };
+      }
+    }
+
     return null;
   }
 
@@ -343,6 +350,8 @@ export class TypeResolver implements ITypeResolver {
         return { typeName: 'null', confidence: 1.0 };
       case 'TemplateLiteral':
         return { typeName: 'string', confidence: 1.0 };
+      case 'RegExpLiteral':
+        return { typeName: 'RegExp', confidence: 1.0 };
       case 'ArrayExpression':
         return this.inferArrayType(node, typeMap, depth);
       case 'ObjectExpression':
