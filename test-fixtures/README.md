@@ -48,9 +48,14 @@ Output from: `npx ts-node src/index.ts test-fixtures/complex-minified.js test-fi
 ### complex-unminified-full.ts
 Output from: `npx ts-node src/index.ts test-fixtures/complex-minified.js test-fixtures/complex-unminified-full.ts --typescript --infer-types`
 
-- Full TypeScript output with type inference
-- JSDoc type annotations (TypeScript-compatible)
-- Note: Full TypeScript syntax conversion (JSDoc to native TS types) is a future enhancement
+- ✅ **Full TypeScript output with native type annotations**
+- ✅ **JSDoc comments converted to native TypeScript syntax**
+- ✅ **Examples:**
+  - `function e(param: number, value: number): number`
+  - `function l(param5: number[]): number`
+  - `async function s(param8: any): Promise<number>` (async returns wrapped in Promise<>)
+  - `function n1(param11: string, value2: string): object`
+  - `async function t2(): Promise<number>`
 
 ## Testing Commands
 
@@ -106,15 +111,20 @@ The type inference system successfully identifies types through:
 
 ## Known Limitations
 
-1. **JSDoc vs Native TypeScript**: Current TypeScript output uses JSDoc comments rather than native TypeScript function signatures (e.g., `function foo(x: number): string`)
-2. **Complex types**: Generic types, union types, and intersection types are simplified
-3. **Class type inference**: Class properties and methods could have more detailed type information
+1. ~~**JSDoc vs Native TypeScript**~~ ✅ **FIXED**: TypeScript output now uses native TypeScript function signatures (e.g., `function foo(x: number): string`)
+2. **Complex types**: Generic types, union types, and intersection types are simplified (currently uses `object`, `any`, etc.)
+3. **Class type inference**: Class properties and methods don't get type annotations yet
 4. **Variable declarations**: Top-level const/let variables don't get type annotations (only functions)
+5. **Function return type accuracy**: Some complex cases like higher-order functions may have incorrect return types (e.g., a function returning a function may be typed as returning the inner return type)
 
 ## Future Enhancements
 
-- Native TypeScript function signature conversion
+- ~~Native TypeScript function signature conversion~~ ✅ **DONE**
+- ~~Async function Promise<> return type wrapping~~ ✅ **DONE**
 - Variable type annotations (`const x: number = 42`)
+- Class property type annotations
 - Interface generation from object literals
-- Generic type inference
+- Generic type inference (e.g., `Array<number>` instead of `number[]`)
+- Union and intersection types
 - More sophisticated type narrowing
+- Higher-order function return types

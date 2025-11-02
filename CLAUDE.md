@@ -2,6 +2,34 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ CRITICAL: Test-Driven Development
+
+**ALWAYS UPDATE TESTS WHEN CHANGING FUNCTIONALITY**
+
+When modifying, adding, or fixing any functionality in this codebase, you MUST update or add corresponding tests. This is non-negotiable.
+
+### Test Update Requirements
+
+1. **Before making changes**: Run existing tests to ensure they pass
+2. **After making changes**:
+   - Update existing tests if behavior has changed
+   - Add new tests for new functionality
+   - Add regression tests for bug fixes
+   - Run tests to verify they pass: `npm test`
+3. **Test coverage**: Aim for 70%+ coverage for new code
+
+### What requires test updates:
+
+- ✅ **New features** → Add comprehensive tests
+- ✅ **Bug fixes** → Add regression tests
+- ✅ **Refactoring** → Update tests to match new structure
+- ✅ **API changes** → Update integration tests
+- ✅ **TypeScript generation changes** → Update unminifier.test.ts
+- ✅ **Type inference changes** → Update type-inferer.test.ts
+- ✅ **CLI changes** → Update index.test.ts
+
+**Example**: If you modify TypeScript generation to add explicit `any` types, you must update tests in `unminifier.test.ts` to verify the new behavior.
+
 ## Project Overview
 
 InflateJS is a TypeScript application that unminifies JavaScript code by restoring proper formatting, improving variable names, and inferring types. It uses Babel for AST parsing/generation and Prettier for code formatting.

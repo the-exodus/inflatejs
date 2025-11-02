@@ -6,65 +6,54 @@ const variable4 = {
   y: 20,
   z: 30
 };
-/**
- * @type {(number, number) => number}
- */
-function e(param, value) {
+function e(param: number, value: number): number {
   return param + value;
 }
-function h(param2) {
-  const variable5 = param2.map(param3 => {
+function h(param2: any) {
+  const variable5 = param2.map((param3: any) => {
     return param3 * 2;
   });
-  return variable5.filter(param4 => {
+  return variable5.filter((param4: any) => {
     return param4 > 5;
   });
 }
-/**
- * @type {(number[]) => number}
- */
-function l(param5) {
+function l(param5: number[]): number {
   let variable6 = 0;
-  for (let variable7 = 0; variable7 < param5.length; variable7++) {
+  for(let variable7 = 0; variable7 < param5.length; variable7++: any) {
     variable6 += param5[variable7];
   }
   return variable6;
 }
-function p(param6) {
-  return new Promise(param7 => {
+function p(param6: any) {
+  return new Promise((param7: any) => {
     setTimeout(() => {
       return param7(param6 * 2);
     }, 100);
   });
 }
-/**
- * @type {(any) => number}
- */
-async function s(param8) {
+async function s(param8: any): Promise<number> {
   const variable8 = await p(param8);
   return variable8 + 10;
 }
 class v {
-  constructor(w, x) {
+
+  w: any;
+
+  x: any;
+  constructor(w: any, x: any) {
     this.w = w;
     this.x = x;
   }
   y() {
     return this.w + this.x;
   }
-  z(a1) {
+  z(a1: any) {
     return this.w * a1;
   }
 }
-/**
- * @type {(number) => number}
- */
-function b1(param9) {
+function b1(param9: number): number {
   let variable9 = 0;
-  /**
-   * @type {(any) => number}
-   */
-  function e1(param10) {
+  function e1(param10: any): number {
     variable9 += param10;
     return variable9;
   }
@@ -79,10 +68,7 @@ const variable13 = l(variable3);
 const variable14 = new v(100, 200);
 const variable15 = variable14.y();
 const variable16 = variable14.z(3);
-/**
- * @type {(string, string) => object}
- */
-function n1(param11, value2) {
+function n1(param11: string, value2: string): object {
   const variable17 = param11.toUpperCase();
   const variable18 = value2.split(",");
   return {
@@ -91,21 +77,18 @@ function n1(param11, value2) {
   };
 }
 const variable19 = n1(variable2, "a,b,c");
-function v1(param12) {
-  return param12.filter(param13 => {
+function v1(param12: any) {
+  return param12.filter((param13: any) => {
     return param13 % 2 === 0;
-  }).map(param14 => {
+  }).map((param14: any) => {
     return param14 * param14;
-  }).reduce((param15, value3) => {
+  }).reduce((param15: any, value3: any) => {
     return param15 + value3;
   }, 0);
 }
 const variable20 = v1([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-/**
- * @type {(number, number) => number}
- */
-function b2(param16, value4) {
-  if (param16 > value4) {
+function b2(param16: number, value4: number): number {
+  if(param16 > value4: any) {
     return param16 - value4;
   } else if (param16 < value4) {
     return value4 - param16;
@@ -114,10 +97,7 @@ function b2(param16, value4) {
   }
 }
 const variable21 = b2(100, 50);
-/**
- * @type {() => object}
- */
-function f2() {
+function f2(): object {
   const variable22 = {
     name: "John",
     age: 30,
@@ -126,29 +106,23 @@ function f2() {
   return variable22;
 }
 const variable23 = f2();
-/**
- * @type {(string) => number}
- */
-function i2(param17) {
+function i2(param17: string): number {
   const variable24 = param17.charAt(0);
   const variable25 = param17.length;
   const variable26 = param17.substring(1, 5);
   return variable24 + variable26 + variable25;
 }
 const variable27 = i2("JavaScript");
-function o2(param18, value5) {
-  return new Promise((param19, value6) => {
-    if (param18 > 0) {
+function o2(param18: any, value5: any) {
+  return new Promise((param19: any, value6: any) => {
+    if(param18 > 0: any) {
       param19(param18 * value5);
     } else {
       value6("Invalid number");
     }
   });
 }
-/**
- * @type {() => number}
- */
-async function t2() {
+async function t2(): Promise<number> {
   try {
     const variable28 = await o2(5, 10);
     const variable29 = await s(variable28);
@@ -158,8 +132,8 @@ async function t2() {
   }
 }
 const variable30 = [[1, 2], [3, 4], [5, 6]];
-function y2(param20) {
-  return param20.flat().reduce((param21, value7) => {
+function y2(param20: any) {
+  return param20.flat().reduce((param21: any, value7: any) => {
     return param21 + value7;
   }, 0);
 }

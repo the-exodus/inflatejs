@@ -220,6 +220,69 @@ describe('unminify', () => {
       expect(result).toContain('function');
       expect(result).toContain('return');
     });
+
+    it('should add explicit any types to untyped function parameters', async () => {
+      const minified = 'function greet(name){return "Hello "+name;}';
+      const result = await unminify(minified, { outputFormat: 'ts', inferTypes: false });
+
+      // Should have explicit any type for parameter
+      expect(result).toMatch(/name:\s*any/);
+    });
+
+    it('should add explicit any types to arrow function parameters', async () => {
+      const minified = '[1,2,3].map(x=>x*2)';
+      const result = await unminify(minified, { outputFormat: 'ts', inferTypes: false });
+
+      // Should have explicit any type for arrow function parameter (x may be renamed to param)
+      expect(result).toMatch(/\w+:\s*any/);
+      expect(result).toContain('=>');
+    });
+
+    it('should handle empty arrow functions without adding types', async () => {
+      const minified = 'setTimeout(()=>{console.log("hi");},100);';
+      const result = await unminify(minified, { outputFormat: 'ts', inferTypes: false });
+
+      // Empty arrow function should remain () => not (: any) =>
+      expect(result).toMatch(/\(\)\s*=>/);
+      expect(result).not.toMatch(/\(:\s*any\)\s*=>/);
+    });
+
+    it('should add class property declarations', async () => {
+      const minified = 'class Person{constructor(name,age){this.name=name;this.age=age;}}';
+      const result = await unminify(minified, { outputFormat: 'ts', inferTypes: false });
+
+      // Should have property declarations
+      expect(result).toMatch(/name:\s*any/);
+      expect(result).toMatch(/age:\s*any/);
+      // Properties should appear before constructor
+      const nameIndex = result.indexOf('name: any');
+      const constructorIndex = result.indexOf('constructor');
+      expect(nameIndex).toBeLessThan(constructorIndex);
+    });
+
+    it('should add explicit any to class method parameters', async () => {
+      const minified = 'class Calculator{add(x,y){return x+y;}}';
+      const result = await unminify(minified, { outputFormat: 'ts', inferTypes: false });
+
+      // Method parameters should have explicit any types
+      expect(result).toMatch(/add\s*\(\s*x:\s*any\s*,\s*y:\s*any\s*\)/);
+    });
+
+    it('should use inferred types when available', async () => {
+      const minified = 'function add(a,b){return a+b;}add(5,10);';
+      const result = await unminify(minified, { outputFormat: 'ts', inferTypes: true });
+
+      // Should have inferred number types
+      expect(result).toMatch(/add\s*\(\s*\w+:\s*number\s*,\s*\w+:\s*number\s*\):\s*number/);
+    });
+
+    it('should wrap async function return types in Promise', async () => {
+      const minified = 'async function fetchData(){return 42;}';
+      const result = await unminify(minified, { outputFormat: 'ts', inferTypes: true });
+
+      // Should have Promise<number> return type, not just number
+      expect(result).toMatch(/Promise<\w+>/);
+    });
   });
 
   describe('complex code transformations', () => {
