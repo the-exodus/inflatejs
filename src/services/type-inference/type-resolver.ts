@@ -111,7 +111,12 @@ export class TypeResolver implements ITypeResolver {
     if (depth > this.config.maxDepth) return null;
     if (this.config.maxTime && Date.now() - this.startTime > this.config.maxTime) return null;
     if (visited.has(funcInfo.name)) return null;
-    if (funcInfo.returnType) return funcInfo.returnType;
+
+    // Only use cached return type if it has high confidence
+    // This allows re-evaluation in multi-pass scenarios where variable types improve
+    if (funcInfo.returnType && funcInfo.returnType.confidence >= 0.9) {
+      return funcInfo.returnType;
+    }
 
     visited.add(funcInfo.name);
 
@@ -151,23 +156,26 @@ export class TypeResolver implements ITypeResolver {
       }
     });
 
-    funcInfo.returnType = returnType;
+    // Only update if we got a better confidence score
+    if (!funcInfo.returnType || returnType.confidence > funcInfo.returnType.confidence) {
+      funcInfo.returnType = returnType;
 
-    // Update function type in typeMap
-    if (typeMap.has(funcInfo.name)) {
-      const paramTypes = funcInfo.params.map((p: string) => {
-        const type = typeMap.get(p);
-        return type ? type.typeName : 'any';
-      });
+      // Update function type in typeMap
+      if (typeMap.has(funcInfo.name)) {
+        const paramTypes = funcInfo.params.map((p: string) => {
+          const type = typeMap.get(p);
+          return type ? type.typeName : 'any';
+        });
 
-      const typeStr = hasExplicitReturn
-        ? `(${paramTypes.join(', ')}) => ${returnType.typeName}`
-        : `(${paramTypes.join(', ')}) => void`;
+        const typeStr = hasExplicitReturn
+          ? `(${paramTypes.join(', ')}) => ${returnType.typeName}`
+          : `(${paramTypes.join(', ')}) => void`;
 
-      typeMap.set(funcInfo.name, {
-        typeName: typeStr,
-        confidence: Math.max(0.6, returnType.confidence)
-      });
+        typeMap.set(funcInfo.name, {
+          typeName: typeStr,
+          confidence: Math.max(0.6, returnType.confidence)
+        });
+      }
     }
 
     visited.delete(funcInfo.name);
