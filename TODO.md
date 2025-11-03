@@ -269,11 +269,25 @@ function log(message, ...args) {
 // Expected: log: (any, ...any[]) => void
 ```
 
-### 10. Default Parameters
+### 10. Default Parameters ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low-Medium (30 minutes)
 
-Function parameters with default values.
+~~Function parameters with default values.~~
+**Status**: Implemented and tested (33 tests passing)
+
+**Implementation notes**:
+- Added AssignmentPattern handling to TypeCollector for all function types
+- Added parameter type annotation support in UnminificationPipeline for:
+  - Function declarations
+  - Arrow functions
+  - Function expressions
+  - Class methods and constructors
+- Added BinaryExpression type inference for defaults like `y = 5 + 10`
+- Added MemberExpression type inference for defaults like `count = str.length`
+- Added Date.now() to knownTypes
+- TypeResolver updated to handle AssignmentPattern in parameter type mapping
+- Supports all primitive types, arrays, objects, expressions, and edge cases
 
 **Examples for tests:**
 ```javascript

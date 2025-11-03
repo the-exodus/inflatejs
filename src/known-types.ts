@@ -36,6 +36,9 @@ export const knownTypes: Map<string, string> = new Map([
   ['Array.isArray', 'boolean'],
   ['Array.from', 'any[]'],
   ['Array.of', 'any[]'],
+  // Date static methods
+  ['Date.now', 'number'],
+  ['Date.parse', 'number'],
   // Type conversion functions
   ['parseInt', 'number'],
   ['parseFloat', 'number'],

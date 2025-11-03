@@ -731,6 +731,9 @@ export class TypeResolver implements ITypeResolver {
     funcExpr.params.forEach((param, index) => {
       if (t.isIdentifier(param) && paramTypes[index]) {
         typeMap.set(param.name, paramTypes[index]!);
+      } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left) && paramTypes[index]) {
+        // Handle default parameters
+        typeMap.set(param.left.name, paramTypes[index]!);
       }
     });
 
@@ -889,6 +892,10 @@ export class TypeResolver implements ITypeResolver {
     const paramTypes = node.params.map(param => {
       if (t.isIdentifier(param)) {
         const type = typeMap.get(param.name);
+        return type ? type.typeName : 'any';
+      } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+        // Handle default parameters
+        const type = typeMap.get(param.left.name);
         return type ? type.typeName : 'any';
       }
       return 'any';

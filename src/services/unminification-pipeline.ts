@@ -102,6 +102,17 @@ export class UnminificationPipeline implements IUnminificationPipeline {
               if (t.isIdentifier(param) && parsedType.paramTypes[index]) {
                 const paramTypeStr = parsedType.paramTypes[index];
                 param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramTypeStr);
+              } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+                // Handle default parameters - check the typeMap for inferred type
+                const paramName = param.left.name;
+                const paramType = typeMap.get(paramName);
+                if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any' && !param.left.typeAnnotation) {
+                  param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+                } else if (parsedType.paramTypes[index] && !param.left.typeAnnotation) {
+                  param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(parsedType.paramTypes[index]);
+                } else if (!param.left.typeAnnotation) {
+                  param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+                }
               }
             });
 
@@ -120,6 +131,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
           path.node.params.forEach((param: any) => {
             if (t.isIdentifier(param) && !param.typeAnnotation) {
               param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+              // Handle default parameters - check the typeMap for inferred type
+              const paramName = param.left.name;
+              const paramType = typeMap.get(paramName);
+              if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any' && !param.left.typeAnnotation) {
+                param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+              } else if (!param.left.typeAnnotation) {
+                param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+              }
             }
           });
         }
@@ -131,6 +151,34 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         path.node.params.forEach((param: any) => {
           if (t.isIdentifier(param) && !param.typeAnnotation) {
             param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+          } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+            // Handle default parameters - check the typeMap for inferred type
+            const paramName = param.left.name;
+            const paramType = typeMap.get(paramName);
+            if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any' && !param.left.typeAnnotation) {
+              param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+            } else if (!param.left.typeAnnotation) {
+              param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            }
+          }
+        });
+      },
+
+      // Add type annotations to function expressions
+      FunctionExpression: (path: any) => {
+        // Add 'any' type to parameters without type annotations
+        path.node.params.forEach((param: any) => {
+          if (t.isIdentifier(param) && !param.typeAnnotation) {
+            param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+          } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+            // Handle default parameters - check the typeMap for inferred type
+            const paramName = param.left.name;
+            const paramType = typeMap.get(paramName);
+            if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any' && !param.left.typeAnnotation) {
+              param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+            } else if (!param.left.typeAnnotation) {
+              param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            }
           }
         });
       },
@@ -174,6 +222,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
           constructor.params.forEach((param: any) => {
             if (t.isIdentifier(param) && !param.typeAnnotation) {
               param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+              // Handle default parameters - check the typeMap for inferred type
+              const paramName = param.left.name;
+              const paramType = typeMap.get(paramName);
+              if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any' && !param.left.typeAnnotation) {
+                param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+              } else if (!param.left.typeAnnotation) {
+                param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+              }
             }
           });
         }
@@ -232,6 +289,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
               member.params.forEach((param: any) => {
                 if (t.isIdentifier(param) && !param.typeAnnotation) {
                   param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+                } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+                  // Handle default parameters - check the typeMap for inferred type
+                  const paramName = param.left.name;
+                  const paramType = typeMap.get(paramName);
+                  if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any' && !param.left.typeAnnotation) {
+                    param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+                  } else if (!param.left.typeAnnotation) {
+                    param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+                  }
                 }
               });
             }

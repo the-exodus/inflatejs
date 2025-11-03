@@ -63,6 +63,15 @@ export class TypeCollector implements ITypeCollector {
       path.node.params.forEach(param => {
         if (t.isIdentifier(param)) {
           typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+        } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+          // Handle default parameters
+          const paramName = param.left.name;
+          const inferredType = this.inferTypeFromNode(param.right);
+          if (inferredType) {
+            typeMap.set(paramName, inferredType);
+          } else {
+            typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+          }
         }
       });
     }
@@ -75,6 +84,15 @@ export class TypeCollector implements ITypeCollector {
     path.node.params.forEach(param => {
       if (t.isIdentifier(param)) {
         typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+      } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+        // Handle default parameters
+        const paramName = param.left.name;
+        const inferredType = this.inferTypeFromNode(param.right);
+        if (inferredType) {
+          typeMap.set(paramName, inferredType);
+        } else {
+          typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+        }
       }
     });
   }
@@ -89,6 +107,15 @@ export class TypeCollector implements ITypeCollector {
     path.node.params.forEach(param => {
       if (t.isIdentifier(param)) {
         typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+      } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+        // Handle default parameters
+        const paramName = param.left.name;
+        const inferredType = this.inferTypeFromNode(param.right);
+        if (inferredType) {
+          typeMap.set(paramName, inferredType);
+        } else {
+          typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+        }
       }
     });
   }
@@ -133,6 +160,10 @@ export class TypeCollector implements ITypeCollector {
         return this.inferConditionalExpressionType(node);
       case 'LogicalExpression':
         return this.inferLogicalExpressionType(node);
+      case 'BinaryExpression':
+        return this.inferBinaryExpressionType(node);
+      case 'MemberExpression':
+        return this.inferMemberExpressionType(node);
       default:
         return { typeName: 'any', confidence: 0.1 };
     }
@@ -398,5 +429,59 @@ export class TypeCollector implements ITypeCollector {
 
     // Create union type or simplify if same type
     return this.createUnionType(leftType, rightType);
+  }
+
+  /**
+   * Infer type from binary expression (+, -, *, /, %, etc.)
+   */
+  private inferBinaryExpressionType(node: t.BinaryExpression): InferredType {
+    // Comparison operators always return boolean
+    if (['==', '===', '!=', '!==', '<', '<=', '>', '>=', 'in', 'instanceof'].includes(node.operator)) {
+      return { typeName: 'boolean', confidence: 1.0 };
+    }
+
+    // Bitwise and arithmetic operators (except +) return number
+    if (['-', '*', '/', '%', '**', '&', '|', '^', '<<', '>>', '>>>'].includes(node.operator)) {
+      return { typeName: 'number', confidence: 1.0 };
+    }
+
+    // The + operator is tricky - can be addition or concatenation
+    if (node.operator === '+') {
+      const leftType = this.inferTypeFromNode(node.left);
+      const rightType = this.inferTypeFromNode(node.right);
+
+      // If either operand is a string, result is string
+      if (leftType?.typeName === 'string' || rightType?.typeName === 'string') {
+        return { typeName: 'string', confidence: 0.9 };
+      }
+
+      // If both are numbers, result is number
+      if (leftType?.typeName === 'number' && rightType?.typeName === 'number') {
+        return { typeName: 'number', confidence: 1.0 };
+      }
+
+      // Otherwise, uncertain
+      return { typeName: 'any', confidence: 0.4 };
+    }
+
+    return { typeName: 'any', confidence: 0.3 };
+  }
+
+  /**
+   * Infer type from member expression (e.g., obj.property, arr.length)
+   */
+  private inferMemberExpressionType(node: t.MemberExpression): InferredType {
+    // Handle common properties with known return types
+    if (t.isIdentifier(node.property)) {
+      const propertyName = node.property.name;
+
+      // Array/String .length property
+      if (propertyName === 'length') {
+        return { typeName: 'number', confidence: 0.9 };
+      }
+    }
+
+    // Default: unable to infer
+    return { typeName: 'any', confidence: 0.3 };
   }
 }
