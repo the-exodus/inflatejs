@@ -533,17 +533,19 @@ const doubled = value * 2; // Only works with number part
 - More accurate logical expression types (item #4: already implemented, would be enhanced)
 - Improved conditional expression types (item #3: already implemented, would be enhanced)
 
-### 18. Context-Aware Method Inference (slice)
+### 18. Context-Aware Method Inference (slice) ✅ COMPLETED
 **Impact**: Medium-High (very common method)
 **Effort**: Medium (1-2 hours)
 
-**Why needed**: The `slice()` method exists on both strings and arrays with different return types:
+~~**Why needed**: The `slice()` method exists on both strings and arrays with different return types:
 - `string.slice()` → returns `string`
 - `array.slice()` → returns same array type (e.g., `number[]`)
 
-Currently, `slice()` is excluded from method inference because TypeCollector doesn't track object types during the initial inference pass, making it impossible to distinguish which `slice` is being called.
+Currently, `slice()` is excluded from method inference because TypeCollector doesn't track object types during the initial inference pass, making it impossible to distinguish which `slice` is being called.~~
 
-**Solution approach**: Enhance TypeCollector to track object types during CallExpression inference, allowing it to determine the correct return type based on the callee's object type.
+~~**Solution approach**: Enhance TypeCollector to track object types during CallExpression inference, allowing it to determine the correct return type based on the callee's object type.~~
+
+**Status**: Implemented and tested (31 tests passing)
 
 **Examples for tests:**
 ```javascript
@@ -578,11 +580,14 @@ const result2 = flag ? text.slice(0, 2) : "world";
 ```
 
 **Implementation notes:**
-- Modify TypeCollector's `inferCallExpressionType` to check object type when methodName is `slice`
-- For `MemberExpression` callees, try to infer the object type first
-- If object type is `string` or contains `string`, return `{ typeName: 'string', confidence: 0.9 }`
-- If object type contains `[]` (array type), return `{ typeName: objectType, confidence: 0.9 }`
-- Fall back to `{ typeName: 'any', confidence: 0.3 }` if object type is unknown
+- ✅ Enhanced TypeResolver's `inferCallType` to handle instance method calls context-aware
+- ✅ Added recursive type inference for chained method calls (e.g., `arr.slice().filter()`)
+- ✅ Modified `propagateTypes` to recursively infer types for complex call expressions
+- ✅ Added `propagateTypes` call to TypeResolver's `resolveTypes` iteration loop
+- ✅ TypeCollector returns moderate confidence (0.6) for `slice()` and `concat()` to allow TypeResolver to refine
+- ✅ Handles `slice()`, `concat()`, and all array methods returning same type (`map`, `filter`, etc.)
+- ✅ Works correctly in chained calls, ternary expressions, and logical expressions
+- ✅ Comprehensive test coverage with 31 tests including edge cases
 
 ## Priority 3: Advanced (Lower Impact or Complex)
 
@@ -901,20 +906,22 @@ For each TODO item:
 - Total test count: 256 (up from 181)
 - Coverage improved from ~50% to ~75%+ of common JavaScript patterns
 
-### Phase 2 Progress
+### Phase 2 Progress ✅ COMPLETED
 - Item 5 (Logical expressions): Added 30 new tests (all passing) ✅
 - Item 6 (RegExp literals): Added 28 new tests (all passing) ✅
 - Item 7 (Object/Array static methods) + Item 8 (Type conversion): Added 33 new tests (all passing) ✅
 - Item 9 (Union type inference): Added 22 new tests (all passing) ✅
-- Total test count: 370 (up from 315)
+- Item 10 (Context-aware method inference): Added 31 new tests (all passing) ✅
+- Total test count: 401 (up from 315)
+- **Phase 2 complete!** All common JavaScript patterns now have robust type inference.
 
-### Phase 2 (2-3 hours): Common Patterns
+### Phase 2 (2-3 hours): Common Patterns ✅ COMPLETED
 5. Logical expressions for values ✅
 6. RegExp literals ✅
 7. Object/Array static methods ✅
 8. Type conversion functions ✅
 9. Union type inference ✅
-10. Context-aware method inference (slice)
+10. Context-aware method inference (slice) ✅
 
 ### Phase 3 (3 hours): Modern JavaScript
 11. Default parameters

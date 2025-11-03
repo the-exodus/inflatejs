@@ -178,11 +178,16 @@ export class TypeCollector implements ITypeCollector {
         const methodName = node.callee.property.name;
 
         // Common string methods that return string (only unambiguous ones)
-        // Note: 'slice' is excluded because it exists on both strings and arrays
         if (['toUpperCase', 'toLowerCase', 'trim', 'trimStart', 'trimEnd',
              'substring', 'substr', 'replace', 'replaceAll',
              'repeat', 'padStart', 'padEnd', 'charAt'].includes(methodName)) {
           return { typeName: 'string', confidence: 0.9 };
+        }
+
+        // Methods that exist on both strings and arrays - return generic type with moderate confidence
+        // TypeResolver will refine these based on context
+        if (methodName === 'slice' || methodName === 'concat') {
+          return { typeName: 'any', confidence: 0.6 };
         }
 
         // String methods that return string[]

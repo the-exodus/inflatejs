@@ -35,6 +35,9 @@ export class TypeResolver implements ITypeResolver {
     for (let i = 0; i < maxIterations; i++) {
       const snapshot = new Map(typeMap);
 
+      // Propagate types across variables through assignments and calls
+      this.propagateTypes(typeMap, callGraph);
+
       // Infer types from call graph
       this.inferTypesFromCallGraph(typeMap, callGraph);
 
@@ -224,11 +227,20 @@ export class TypeResolver implements ITypeResolver {
       // Method calls
       if (t.isMemberExpression(node.callee) && t.isIdentifier(node.callee.property)) {
         const methodName = node.callee.property.name;
+
+        // Get the object type - either from typeMap or by inferring it recursively
+        let objType: InferredType | null = null;
+
         if (t.isIdentifier(node.callee.object)) {
-          const objType = typeMap.get(node.callee.object.name);
-          if (objType) {
-            return this.inferMethodReturnType(objType.typeName, methodName);
-          }
+          // Simple case: obj.method()
+          objType = typeMap.get(node.callee.object.name) || null;
+        } else {
+          // Complex case: (expression).method() - e.g., arr.slice().filter()
+          objType = this.inferTypeFromNode(node.callee.object, typeMap, depth + 1);
+        }
+
+        if (objType) {
+          return this.inferMethodReturnType(objType.typeName, methodName);
         }
       }
       // Function calls
@@ -411,19 +423,39 @@ export class TypeResolver implements ITypeResolver {
    * Infer type from call expression
    */
   private inferCallType(node: t.CallExpression, typeMap: TypeMap): InferredType {
-    // Handle static method calls (e.g., Object.keys(), Array.isArray())
-    if (t.isMemberExpression(node.callee) &&
-        t.isIdentifier(node.callee.object) &&
-        t.isIdentifier(node.callee.property)) {
-      const objectName = node.callee.object.name;
+    // Handle instance method calls (e.g., text.slice(), arr.map())
+    if (t.isMemberExpression(node.callee) && t.isIdentifier(node.callee.property)) {
       const methodName = node.callee.property.name;
-      const fullName = `${objectName}.${methodName}`;
 
-      if (knownTypes.has(fullName)) {
-        return {
-          typeName: knownTypes.get(fullName)!,
-          confidence: 0.9
-        };
+      // Get the object type - either from typeMap or by inferring it recursively
+      let objType: InferredType | null = null;
+
+      if (t.isIdentifier(node.callee.object)) {
+        // Simple case: obj.method()
+        objType = typeMap.get(node.callee.object.name) || null;
+      } else {
+        // Complex case: (expression).method() - e.g., arr.slice().filter()
+        objType = this.inferTypeFromNode(node.callee.object, typeMap, 0);
+      }
+
+      if (objType) {
+        const methodReturnType = this.inferMethodReturnType(objType.typeName, methodName);
+        if (methodReturnType) {
+          return methodReturnType;
+        }
+      }
+
+      // Check if this is a static method call (e.g., Object.keys())
+      if (t.isIdentifier(node.callee.object)) {
+        const objectName = node.callee.object.name;
+        const fullName = `${objectName}.${methodName}`;
+
+        if (knownTypes.has(fullName)) {
+          return {
+            typeName: knownTypes.get(fullName)!,
+            confidence: 0.9
+          };
+        }
       }
     }
 
@@ -603,12 +635,22 @@ export class TypeResolver implements ITypeResolver {
         // Case 2: Variable assigned from function call (const a = func())
         else if (t.isCallExpression(init)) {
           // Method calls (obj.method())
-          if (t.isMemberExpression(init.callee)) {
-            if (t.isIdentifier(init.callee.object) && t.isIdentifier(init.callee.property)) {
-              const objType = typeMap.get(init.callee.object.name);
-              if (objType) {
-                inferredType = this.inferMethodReturnType(objType.typeName, init.callee.property.name);
-              }
+          if (t.isMemberExpression(init.callee) && t.isIdentifier(init.callee.property)) {
+            const methodName = init.callee.property.name;
+
+            // Get the object type - either from typeMap or by inferring it recursively
+            let objType: InferredType | null = null;
+
+            if (t.isIdentifier(init.callee.object)) {
+              // Simple case: obj.method()
+              objType = typeMap.get(init.callee.object.name) || null;
+            } else {
+              // Complex case: (expression).method() - e.g., arr.slice().filter()
+              objType = this.inferTypeFromNode(init.callee.object, typeMap, 0);
+            }
+
+            if (objType) {
+              inferredType = this.inferMethodReturnType(objType.typeName, methodName);
             }
           }
           // Function calls (func())
