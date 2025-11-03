@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:ci": "vitest run --coverage --maxWorkers=2"
+    "test:ci": "vitest run --coverage --maxWorkers=2",
+    "test:compilation": "vitest run typescript-compilation.test.ts"
   },
   "keywords": [
     "javascript",

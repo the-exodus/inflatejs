@@ -238,10 +238,28 @@ Command-line interface that uses `UnminificationFactory` to create a configured 
 
 ### Tests
 - **src/__tests__/**: Test files (vitest)
-  - **known-types.test.ts**: Tests for known-types.ts (100% coverage)
-  - **type-inferer.test.ts**: Tests for type inference system (49 tests)
-  - **unminifier.test.ts**: Tests for unminification (48 tests)
-  - **index.test.ts**: Integration tests for CLI (22 tests)
+
+  **Feature Tests** (401 tests):
+  - **known-types.test.ts**: Tests for known types mapping (29 tests, 100% coverage)
+  - **type-inferer.test.ts**: Core type inference tests (49 tests)
+  - **unminifier.test.ts**: Unminification functionality (55 tests)
+  - **index.test.ts**: CLI integration tests (22 tests)
+  - **template-literals.test.ts**: Template literal inference (8 tests)
+  - **unary-expressions.test.ts**: Unary expression inference (18 tests)
+  - **conditional-expressions.test.ts**: Ternary operator inference (15 tests)
+  - **logical-expressions.test.ts**: Logical expression inference (30 tests)
+  - **regexp-literals.test.ts**: RegExp literal inference (28 tests)
+  - **array-string-methods.test.ts**: Array/string method inference (35 tests)
+  - **static-methods.test.ts**: Static method inference (33 tests)
+  - **multi-pass-inference.test.ts**: Multi-pass type resolution (26 tests)
+  - **union-types.test.ts**: Union type inference (22 tests)
+  - **context-aware-methods.test.ts**: Context-aware method inference (31 tests)
+
+  **Validation Tests** (39 tests):
+  - **typescript-compilation.test.ts**: Verify TypeScript output compiles (17 tests)
+  - **confidence-scores.test.ts**: Verify confidence scores are reasonable (22 tests)
+
+  **Total**: 440 tests across 16 test files
 
 ## Key Implementation Details
 
@@ -267,36 +285,30 @@ The project uses **vitest** with TypeScript support (ts-vitest) for all testing.
 
 ### Test Structure
 
-The test suite consists of 126 tests across 4 test files:
+The test suite consists of **440 tests across 16 test files**, organized into two categories:
 
-1. **known-types.test.ts** (28 tests)
-   - Tests for the known types map
-   - Validates basic JavaScript types, complex types, array methods, string methods, and object methods
-   - Achieves 100% code coverage
+#### Feature Tests (401 tests)
+Comprehensive tests for all implemented features, covering minimal cases, realistic scenarios, edge cases, and integration scenarios.
 
-2. **type-inferer.test.ts** (26 tests)
-   - Tests for the type inference system
-   - Covers literal type inference, array types, object types, function types, usage-based inference
-   - Tests parameter type inference, known types integration, edge cases, and confidence scoring
-   - Achieves 85% code coverage
+#### Validation Tests (39 tests)
+Tests that verify quality metrics:
 
-3. **unminifier.test.ts** (50 tests)
-   - Tests for the core unminifier functionality
-   - Covers variable renaming, function transformations, object property transformations
-   - Tests formatting, type inference integration, TypeScript output, complex transformations
-   - Tests real-world scenarios, error handling, and option combinations
-   - Achieves 72% code coverage
+1. **typescript-compilation.test.ts** (17 tests)
+   - Verifies that generated TypeScript code compiles without errors
+   - Tests all Phase 1 and Phase 2 features
+   - Tests complex scenarios and real-world code patterns
+   - Run separately: `npm run test:compilation`
 
-4. **index.test.ts** (22 tests)
-   - Integration tests for the CLI
-   - Tests command-line argument parsing, file I/O, error handling
-   - Tests output validation, complex real-world scenarios, TypeScript output integration
-   - Tests various option combinations
+2. **confidence-scores.test.ts** (22 tests)
+   - Validates that confidence scores meet quality thresholds (≥0.7 for good inferences)
+   - Tests literal types (should be 1.0), method calls (≥0.9), union types (≥0.7)
+   - Verifies type propagation maintains reasonable confidence
+   - Run with other tests: `npm test confidence-scores.test.ts`
 
 ### Running Tests
 
 ```bash
-# Run all tests
+# Run all feature tests (excludes compilation tests for speed)
 npm test
 
 # Run tests in watch mode (useful during development)
@@ -307,7 +319,23 @@ npm run test:coverage
 
 # Run tests in CI mode
 npm run test:ci
+
+# Run TypeScript compilation validation tests
+npm run test:compilation
+
+# Run specific test file
+npm test -- <filename>.test.ts
 ```
+
+### Testing Strategy (from TODO.md)
+
+For each feature implementation:
+
+1. ✅ **Create a minimal test case** showing the construct in isolation
+2. ✅ **Create a realistic test case** showing the construct in context
+3. ✅ **Test edge cases** (nested, combined with other features)
+4. ✅ **Verify TypeScript output** compiles without errors (`typescript-compilation.test.ts`)
+5. ✅ **Check confidence scores** are reasonable (≥0.7 for good inferences in `confidence-scores.test.ts`)
 
 ### Current Coverage
 
