@@ -778,12 +778,12 @@ const lengths = words.map(word => word.length);
 // Expected: word: string, lengths: number[]
 ```
 
-### 28. Chained Method Calls
+### 28. Chained Method Calls ✅ COMPLETED
 **Impact**: High (common pattern)
 **Effort**: Medium (current system should handle, may need fixes)
 
-**Examples for tests:**
-```javascript
+~~**Examples for tests:**~~
+~~```javascript
 const result = "hello,world,test"
   .split(",")
   .map(s => s.toUpperCase())
@@ -791,7 +791,20 @@ const result = "hello,world,test"
   .join("-");
 // Expected: result: string
 // Each step: split->string[], map->string[], filter->string[], join->string
-```
+```~~
+
+**Status**: Implemented and tested (26 tests passing)
+
+**Implementation notes:**
+- ✅ Implemented as part of context-aware method inference (item 10/18)
+- ✅ Recursive type inference through `inferCallType` in TypeResolver
+- ✅ Handles chains of any length (tested up to 7 methods)
+- ✅ Works with string methods: `split()->map()->filter()->join()`
+- ✅ Works with array methods: `slice()->filter()->map()->reverse()`
+- ✅ Works in expressions: ternary, logical OR/AND
+- ✅ Handles mixed chains: string to array and back
+- ✅ Real-world examples: CSV parsing, data pipelines, URL processing
+- ✅ Note: Callback parameter inference (item 27) is a separate advanced feature
 
 ### 29. IndexedAccess / Computed Member Access
 **Impact**: Medium

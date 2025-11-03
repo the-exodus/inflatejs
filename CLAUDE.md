@@ -239,7 +239,7 @@ Command-line interface that uses `UnminificationFactory` to create a configured 
 ### Tests
 - **src/__tests__/**: Test files (vitest)
 
-  **Feature Tests** (401 tests):
+  **Feature Tests** (427 tests):
   - **known-types.test.ts**: Tests for known types mapping (29 tests, 100% coverage)
   - **type-inferer.test.ts**: Core type inference tests (49 tests)
   - **unminifier.test.ts**: Unminification functionality (55 tests)
@@ -254,12 +254,13 @@ Command-line interface that uses `UnminificationFactory` to create a configured 
   - **multi-pass-inference.test.ts**: Multi-pass type resolution (26 tests)
   - **union-types.test.ts**: Union type inference (22 tests)
   - **context-aware-methods.test.ts**: Context-aware method inference (31 tests)
+  - **chained-methods.test.ts**: Chained method call inference (26 tests)
 
   **Validation Tests** (39 tests):
   - **typescript-compilation.test.ts**: Verify TypeScript output compiles (17 tests)
   - **confidence-scores.test.ts**: Verify confidence scores are reasonable (22 tests)
 
-  **Total**: 440 tests across 16 test files
+  **Total**: 466 tests across 17 test files
 
 ## Key Implementation Details
 
