@@ -366,6 +366,10 @@ export class TypeResolver implements ITypeResolver {
       case 'NewExpression':
         return this.inferNewExpressionType(node as t.NewExpression, typeMap, depth);
       case 'Identifier':
+        // Handle special identifier literals like 'undefined'
+        if (t.isIdentifier(node) && node.name === 'undefined') {
+          return { typeName: 'undefined', confidence: 1.0 };
+        }
         return typeMap.get(node.name) || { typeName: 'any', confidence: 0.1 };
       case 'BinaryExpression':
         return this.inferBinaryExpressionType(node, typeMap, depth);
@@ -491,6 +495,48 @@ export class TypeResolver implements ITypeResolver {
   }
 
   /**
+   * Create a union type from two inferred types
+   * Handles simplification, deduplication, and nested unions
+   */
+  private createUnionType(type1: InferredType, type2: InferredType): InferredType {
+    // If either type has low confidence (<0.7), fall back to any
+    if (type1.confidence < 0.7 || type2.confidence < 0.7) {
+      return { typeName: 'any', confidence: 0.5 };
+    }
+
+    // If both types are the same, simplify (string | string -> string)
+    if (type1.typeName === type2.typeName) {
+      return {
+        typeName: type1.typeName,
+        confidence: Math.min(type1.confidence, type2.confidence) * 0.95
+      };
+    }
+
+    // Split existing union types to flatten nested unions
+    const types1 = type1.typeName.includes('|')
+      ? type1.typeName.split('|').map(t => t.trim())
+      : [type1.typeName];
+    const types2 = type2.typeName.includes('|')
+      ? type2.typeName.split('|').map(t => t.trim())
+      : [type2.typeName];
+
+    // Combine and deduplicate
+    const allTypes = [...types1, ...types2];
+    const uniqueTypes = Array.from(new Set(allTypes));
+
+    // Limit complexity: if more than 4 types, fall back to any
+    if (uniqueTypes.length > 4) {
+      return { typeName: 'any', confidence: 0.5 };
+    }
+
+    // Create union type string
+    const unionTypeName = uniqueTypes.join(' | ');
+    const confidence = Math.min(type1.confidence, type2.confidence) * 0.9;
+
+    return { typeName: unionTypeName, confidence };
+  }
+
+  /**
    * Infer type from conditional (ternary) expression
    */
   private inferConditionalExpressionType(
@@ -507,17 +553,8 @@ export class TypeResolver implements ITypeResolver {
       return { typeName: 'any', confidence: 0.3 };
     }
 
-    // If both branches have the same type, return that type
-    if (consequentType.typeName === alternateType.typeName) {
-      return {
-        typeName: consequentType.typeName,
-        confidence: Math.min(consequentType.confidence, alternateType.confidence) * 0.95
-      };
-    }
-
-    // Different types - return any as a fallback
-    // In the future, we could return union types like "string | number"
-    return { typeName: 'any', confidence: 0.5 };
+    // Create union type or simplify if same type
+    return this.createUnionType(consequentType, alternateType);
   }
 
   /**
@@ -537,18 +574,8 @@ export class TypeResolver implements ITypeResolver {
       return { typeName: 'any', confidence: 0.3 };
     }
 
-    // If both operands have the same type, return that type
-    // This works for ||, &&, and ?? operators
-    if (leftType.typeName === rightType.typeName) {
-      return {
-        typeName: leftType.typeName,
-        confidence: Math.min(leftType.confidence, rightType.confidence) * 0.95
-      };
-    }
-
-    // Different types - return any as a fallback
-    // In the future, we could return union types like "string | number"
-    return { typeName: 'any', confidence: 0.5 };
+    // Create union type or simplify if same type
+    return this.createUnionType(leftType, rightType);
   }
 
   /**

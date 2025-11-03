@@ -427,11 +427,12 @@ const race = Promise.race([p1, p2]);
 // Expected: race: Promise<number> (or Promise<any>)
 ```
 
-### 17. Union Type Inference
+### 17. Union Type Inference ✅ COMPLETED
 **Impact**: High (improves type accuracy significantly)
 **Effort**: Medium (1-2 hours)
 
-**Why needed**: Currently, when conditional expressions, logical expressions, or function return statements have different types, the system falls back to `any` with low confidence. Union types would preserve type information and improve accuracy.
+~~**Why needed**: Currently, when conditional expressions, logical expressions, or function return statements have different types, the system falls back to `any` with low confidence. Union types would preserve type information and improve accuracy.~~
+**Status**: Implemented and tested (22 tests passing)
 
 **Current limitations addressed:**
 - Conditional expressions: `flag ? "text" : 42` → currently `any`, should be `string | number`
@@ -516,11 +517,15 @@ const doubled = value * 2; // Only works with number part
 ```
 
 **Implementation notes:**
-- Modify `inferConditionalExpressionType` and `inferLogicalExpressionType` to create union types
-- Add utility function `createUnionType(type1: InferredType, type2: InferredType): InferredType`
-- Handle union type simplification and deduplication
-- Update confidence scoring: use minimum confidence of constituent types * 0.9
-- Limit union complexity to prevent `string | number | boolean | object | ...` becoming unwieldy
+- ✅ Modified `inferConditionalExpressionType` and `inferLogicalExpressionType` in both TypeCollector and TypeResolver to create union types
+- ✅ Added utility function `createUnionType(type1: InferredType, type2: InferredType): InferredType` to both classes
+- ✅ Implemented union type simplification (e.g., `string | string` → `string`) and deduplication
+- ✅ Implemented nested union flattening (e.g., `(string | number) | boolean` → `string | number | boolean`)
+- ✅ Confidence scoring: uses minimum confidence of constituent types * 0.9
+- ✅ Complexity limit: max 4 types in a union, otherwise falls back to `any`
+- ✅ Confidence threshold: both types must have confidence ≥ 0.7 to create union, otherwise falls back to `any`
+- ✅ Added support for `undefined` type inference (Identifier with name "undefined")
+- ✅ Fixed TypeScript type builder to handle union types before array types (prevents `(number[] | string)[]`)
 - Document that type narrowing (using unions correctly in operations) is a separate future enhancement
 
 **Related improvements this enables:**
@@ -900,14 +905,15 @@ For each TODO item:
 - Item 5 (Logical expressions): Added 30 new tests (all passing) ✅
 - Item 6 (RegExp literals): Added 28 new tests (all passing) ✅
 - Item 7 (Object/Array static methods) + Item 8 (Type conversion): Added 33 new tests (all passing) ✅
-- Total test count: 348 (up from 315)
+- Item 9 (Union type inference): Added 22 new tests (all passing) ✅
+- Total test count: 370 (up from 315)
 
 ### Phase 2 (2-3 hours): Common Patterns
 5. Logical expressions for values ✅
 6. RegExp literals ✅
 7. Object/Array static methods ✅
 8. Type conversion functions ✅
-9. Union type inference
+9. Union type inference ✅
 10. Context-aware method inference (slice)
 
 ### Phase 3 (3 hours): Modern JavaScript

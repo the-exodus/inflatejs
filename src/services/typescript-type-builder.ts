@@ -24,6 +24,13 @@ export class TypeScriptTypeBuilder {
     if (trimmed === 'never') return t.tsNeverKeyword();
     if (trimmed === 'object') return t.tsObjectKeyword();
 
+    // Handle union types FIRST (e.g., "number | string", "number[] | string[]")
+    // This must come before array type check to handle unions of arrays correctly
+    if (trimmed.includes('|')) {
+      const types = trimmed.split('|').map(t => this.buildTypeNode(t.trim()));
+      return t.tsUnionType(types);
+    }
+
     // Handle array types (e.g., "number[]", "string[]")
     if (trimmed.endsWith('[]')) {
       const elementType = trimmed.slice(0, -2);
@@ -63,12 +70,6 @@ export class TypeScriptTypeBuilder {
       const returnType = t.tsTypeAnnotation(this.buildTypeNode(returnTypeStr));
 
       return t.tsFunctionType(null, parameters, returnType);
-    }
-
-    // Handle union types (e.g., "number|string")
-    if (trimmed.includes('|')) {
-      const types = trimmed.split('|').map(t => this.buildTypeNode(t.trim()));
-      return t.tsUnionType(types);
     }
 
     // Handle intersection types (e.g., "number&string")
