@@ -43,9 +43,8 @@ describe('Logical expression type inference', () => {
       const code = 'const result="text"||123;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Nullish types mixed with other types, confidence too low for proper type inference
-      // TODO: Should infer string | number when union types are properly supported
-      expect(result).toContain('const result');
+      // Should infer union type for OR with different types
+      expect(result).toMatch(/result:\s*(string \| number|number \| string)/);
     });
   });
 
@@ -100,20 +99,16 @@ describe('Logical expression type inference', () => {
       const code = 'const flag=true;const result=flag&&"yes";';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // AND with boolean and string - returns string if flag is true, boolean (false) if falsy
-      // Type inference doesn't track return type of logical AND with different types (confidence too low)
-      // TODO: Should infer boolean | string when union types are properly supported
-      expect(result).toContain('const result');
+      // Should infer union type for AND with different types
+      expect(result).toMatch(/result:\s*(boolean \| string|string \| boolean)/);
     });
 
     it('should handle AND with boolean and number', async () => {
       const code = 'const flag=true;const result=flag&&42;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // AND with boolean and number - returns number if flag is true, boolean (false) if falsy
-      // Type inference doesn't track return type of logical AND with different types (confidence too low)
-      // TODO: Should infer boolean | number when union types are properly supported
-      expect(result).toContain('const result');
+      // Should infer union type for AND with different types
+      expect(result).toMatch(/result:\s*(boolean \| number|number \| boolean)/);
     });
   });
 
@@ -122,10 +117,8 @@ describe('Logical expression type inference', () => {
       const code = 'const str="hello";const result=str&&str.toUpperCase();';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // str && str.toUpperCase() - Method call returns string, BUT logical AND with string literal falsy value
-      // Type inference doesn't track the result type properly (should be string | false)
-      // TODO: Should infer string when the method return type is properly propagated through logical AND
-      expect(result).toContain('const result');
+      // Both sides return string, so result should be string
+      expect(result).toMatch(/result:\s*string/);
     });
 
     it('should handle AND with function call', async () => {
@@ -144,30 +137,24 @@ describe('Logical expression type inference', () => {
       const code = 'const input=null;const value=input??"default";';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Nullish coalescing is parsed correctly, but the result type isn't being inferred
-      // The right side is a string literal, so result should be inferred as string
-      // TODO: Should infer string when nullish coalescing result type propagation is implemented
-      expect(result).toContain('const value');
+      // Should infer union type for nullish coalescing
+      expect(result).toMatch(/value:\s*(null \| string|string \| null)/);
     });
 
     it('should infer number when both sides are numbers', async () => {
       const code = 'const count=null;const value=count??0;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Nullish coalescing with null ?? number literal
-      // Should infer number as the result type
-      // TODO: Should infer number when nullish coalescing result type propagation is implemented
-      expect(result).toContain('const value');
+      // Should infer union type for nullish coalescing
+      expect(result).toMatch(/value:\s*(null \| number|number \| null)/);
     });
 
     it('should handle nullish coalescing with different types', async () => {
       const code = 'const input=null;const value=input??42;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Nullish coalescing with null ?? number literal
-      // Should infer number as the result type
-      // TODO: Should infer number when nullish coalescing result type propagation is implemented
-      expect(result).toContain('const value');
+      // Should infer union type for nullish coalescing
+      expect(result).toMatch(/value:\s*(null \| number|number \| null)/);
     });
   });
 
