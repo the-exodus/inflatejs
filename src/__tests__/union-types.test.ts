@@ -185,13 +185,13 @@ describe('Union type inference', () => {
       expect(result).toMatch(/result:\s*(object\s*\|\s*null|null\s*\|\s*object)/);
     });
 
-    it('should not create unions for low confidence types', async () => {
+    it('should create unions even when intermediate values have low confidence', async () => {
       const code = 'const unknownFunc=()=>Math.random();const result=unknownFunc()>0.5?"text":42;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // unknownFunc return type is not known with high confidence
-      // So the ternary may or may not get union type
-      expect(result).toContain('const');
+      // The ternary branches have high-confidence types (string and number)
+      // So union type is inferred regardless of unknownFunc confidence
+      expect(result).toMatch(/result:\s*(string \| number|number \| string)/);
     });
   });
 });

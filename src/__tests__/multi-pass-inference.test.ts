@@ -127,8 +127,8 @@ describe('Multi-pass type inference', () => {
       const code = 'const a=5>3;const b=10===10;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Comparisons return boolean, but we might not annotate literals
-      expect(result).toContain('const');
+      // Comparisons return boolean
+      expect(result).toMatch(/:\s*boolean/);
     });
   });
 

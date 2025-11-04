@@ -235,9 +235,8 @@ describe('Logical expression type inference', () => {
       const code = 'const flag=true;const name="";const result=flag&&(name||"Guest");';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // flag (boolean) && (name || "Guest") (string) = different types
-      // Expected to not infer a specific type (confidence too low)
-      expect(result).toContain('const');
+      // Should infer union type for nested logical expressions
+      expect(result).toMatch(/result:\s*(boolean \| string|string \| boolean)/);
     });
   });
 
