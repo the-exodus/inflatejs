@@ -734,6 +734,9 @@ export class TypeResolver implements ITypeResolver {
       } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left) && paramTypes[index]) {
         // Handle default parameters
         typeMap.set(param.left.name, paramTypes[index]!);
+      } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+        // Handle rest parameters - always any[]
+        typeMap.set(param.argument.name, { typeName: 'any[]', confidence: 0.8 });
       }
     });
 
@@ -897,6 +900,10 @@ export class TypeResolver implements ITypeResolver {
         // Handle default parameters
         const type = typeMap.get(param.left.name);
         return type ? type.typeName : 'any';
+      } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+        // Handle rest parameters
+        const type = typeMap.get(param.argument.name);
+        return type ? type.typeName : 'any[]';
       }
       return 'any';
     });

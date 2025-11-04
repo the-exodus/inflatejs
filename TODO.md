@@ -248,11 +248,23 @@ const max = Math.max(...nums);
 // Expected: max: number
 ```
 
-### 9. Rest Parameters
+### 9. Rest Parameters ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Medium (1 hour)
 
-Functions with rest parameters.
+~~Functions with rest parameters.~~
+**Status**: Implemented and tested (27 tests passing)
+
+**Implementation notes**:
+- Added RestElement handling to TypeCollector for all function types
+- Added rest parameter type annotation support in UnminificationPipeline for:
+  - Function declarations
+  - Arrow functions
+  - Function expressions
+  - Class methods and constructors
+- TypeResolver updated to handle RestElement in parameter type mapping
+- Rest parameters correctly typed as `...paramName: any[]`
+- Supports rest with regular parameters, default parameters, and in all function contexts
 
 **Examples for tests:**
 ```javascript
@@ -952,11 +964,12 @@ For each TODO item:
 
 ### Phase 3 Progress
 - Item 11 (Default parameters): Added 33 new tests (all passing) ✅
-- Total test count: 499 (up from 466)
+- Item 12 (Rest parameters): Added 27 new tests (all passing) ✅
+- Total test count: 526 (up from 499)
 
 ### Phase 3 (3 hours): Modern JavaScript
 11. Default parameters ✅
-12. Rest parameters
+12. Rest parameters ✅
 13. Optional chaining
 14. Spread operator
 

@@ -72,6 +72,10 @@ export class TypeCollector implements ITypeCollector {
           } else {
             typeMap.set(paramName, { typeName: 'any', confidence: 0 });
           }
+        } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+          // Handle rest parameters
+          const paramName = param.argument.name;
+          typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
         }
       });
     }
@@ -93,6 +97,10 @@ export class TypeCollector implements ITypeCollector {
         } else {
           typeMap.set(paramName, { typeName: 'any', confidence: 0 });
         }
+      } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+        // Handle rest parameters
+        const paramName = param.argument.name;
+        typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
       }
     });
   }
@@ -116,6 +124,10 @@ export class TypeCollector implements ITypeCollector {
         } else {
           typeMap.set(paramName, { typeName: 'any', confidence: 0 });
         }
+      } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+        // Handle rest parameters
+        const paramName = param.argument.name;
+        typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
       }
     });
   }

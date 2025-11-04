@@ -113,6 +113,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
                 } else if (!param.left.typeAnnotation) {
                   param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
                 }
+              } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+                // Handle rest parameters
+                const paramName = param.argument.name;
+                const paramType = typeMap.get(paramName);
+                if (paramType && paramType.confidence >= 0.7 && !param.typeAnnotation) {
+                  param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+                } else if (!param.typeAnnotation) {
+                  param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any[]');
+                }
               }
             });
 
@@ -140,6 +149,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
               } else if (!param.left.typeAnnotation) {
                 param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
               }
+            } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+              // Handle rest parameters
+              const paramName = param.argument.name;
+              const paramType = typeMap.get(paramName);
+              if (paramType && paramType.confidence >= 0.7 && !param.typeAnnotation) {
+                param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+              } else if (!param.typeAnnotation) {
+                param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any[]');
+              }
             }
           });
         }
@@ -160,6 +178,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
             } else if (!param.left.typeAnnotation) {
               param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
             }
+          } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+            // Handle rest parameters
+            const paramName = param.argument.name;
+            const paramType = typeMap.get(paramName);
+            if (paramType && paramType.confidence >= 0.7 && !param.typeAnnotation) {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+            } else if (!param.typeAnnotation) {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any[]');
+            }
           }
         });
       },
@@ -178,6 +205,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
               param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
             } else if (!param.left.typeAnnotation) {
               param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            }
+          } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+            // Handle rest parameters
+            const paramName = param.argument.name;
+            const paramType = typeMap.get(paramName);
+            if (paramType && paramType.confidence >= 0.7 && !param.typeAnnotation) {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+            } else if (!param.typeAnnotation) {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any[]');
             }
           }
         });
@@ -230,6 +266,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
                 param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
               } else if (!param.left.typeAnnotation) {
                 param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+              }
+            } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+              // Handle rest parameters
+              const paramName = param.argument.name;
+              const paramType = typeMap.get(paramName);
+              if (paramType && paramType.confidence >= 0.7 && !param.typeAnnotation) {
+                param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+              } else if (!param.typeAnnotation) {
+                param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any[]');
               }
             }
           });
@@ -297,6 +342,15 @@ export class UnminificationPipeline implements IUnminificationPipeline {
                     param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
                   } else if (!param.left.typeAnnotation) {
                     param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+                  }
+                } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+                  // Handle rest parameters
+                  const paramName = param.argument.name;
+                  const paramType = typeMap.get(paramName);
+                  if (paramType && paramType.confidence >= 0.7 && !param.typeAnnotation) {
+                    param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+                  } else if (!param.typeAnnotation) {
+                    param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any[]');
                   }
                 }
               });
