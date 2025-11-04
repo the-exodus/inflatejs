@@ -292,6 +292,83 @@ describe('Confidence Score Validation', () => {
     });
   });
 
+  describe('Phase 3 features should have appropriate confidence', () => {
+    it('should assign high confidence to default parameter types', () => {
+      const code = 'function greet(name = "World") { return name; }';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      const nameType = typeMap.get('name');
+      expect(nameType).toBeDefined();
+      expect(nameType!.typeName).toBe('string');
+      expect(nameType!.confidence).toBeGreaterThanOrEqual(0.9);
+    });
+
+    it('should assign high confidence to rest parameter types', () => {
+      const code = 'function sum(...nums) { return nums; }';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      const numsType = typeMap.get('nums');
+      expect(numsType).toBeDefined();
+      expect(numsType!.typeName).toBe('any[]');
+      expect(numsType!.confidence).toBeGreaterThanOrEqual(0.8);
+    });
+
+    it('should assign high confidence to spread operator in arrays', () => {
+      const code = 'const arr1 = [1, 2, 3]; const arr2 = [...arr1, 4, 5];';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+      const callGraph = new CallGraphBuilder().buildCallGraph(ast);
+      const usageMap = new UsageAnalyzer().analyzeUsage(ast, typeMap);
+      const resolver = new TypeResolver();
+      resolver.setCurrentAst(ast);
+      resolver.resolveTypes(typeMap, usageMap, callGraph);
+
+      const arr2Type = typeMap.get('arr2');
+      expect(arr2Type).toBeDefined();
+      expect(arr2Type!.typeName).toBe('number[]');
+      expect(arr2Type!.confidence).toBeGreaterThanOrEqual(0.9);
+    });
+
+    it('should assign high confidence to spread operator in function calls', () => {
+      const code = 'const nums = [1, 2, 3]; const max = Math.max(...nums);';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+      const callGraph = new CallGraphBuilder().buildCallGraph(ast);
+      const usageMap = new UsageAnalyzer().analyzeUsage(ast, typeMap);
+      const resolver = new TypeResolver();
+      resolver.setCurrentAst(ast);
+      resolver.resolveTypes(typeMap, usageMap, callGraph);
+
+      const maxType = typeMap.get('max');
+      expect(maxType).toBeDefined();
+      expect(maxType!.typeName).toBe('number');
+      expect(maxType!.confidence).toBeGreaterThanOrEqual(0.9);
+    });
+
+    it('should assign reasonable confidence to object spread', () => {
+      const code = 'const obj1 = { x: 1 }; const obj2 = { ...obj1, y: 2 };';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+      const callGraph = new CallGraphBuilder().buildCallGraph(ast);
+      const usageMap = new UsageAnalyzer().analyzeUsage(ast, typeMap);
+      const resolver = new TypeResolver();
+      resolver.setCurrentAst(ast);
+      resolver.resolveTypes(typeMap, usageMap, callGraph);
+
+      const obj2Type = typeMap.get('obj2');
+      expect(obj2Type).toBeDefined();
+      expect(obj2Type!.typeName).toBe('object');
+      expect(obj2Type!.confidence).toBeGreaterThanOrEqual(0.7);
+    });
+  });
+
   describe('Type propagation should maintain reasonable confidence', () => {
     it('should propagate high confidence types through assignment', () => {
       const code = 'const original = "hello"; const copied = original;';

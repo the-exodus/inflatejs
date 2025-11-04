@@ -190,6 +190,56 @@ describe('TypeScript Compilation Tests', () => {
     });
   });
 
+  describe('Phase 3 Features', () => {
+    it('should compile default parameters', async () => {
+      const code = 'function greet(name="World"){return `Hello, ${name}!`;}const msg1=greet();const msg2=greet("Alice");';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile rest parameters', async () => {
+      const code = 'function sum(...nums){return nums.reduce((a,b)=>a+b,0);}const total=sum(1,2,3,4);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile spread operator in arrays', async () => {
+      const code = 'const arr1=[1,2,3];const arr2=[...arr1,4,5];const combined=[...arr1,...arr2];';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile spread operator in function calls', async () => {
+      const code = 'const nums=[1,2,3];const max=Math.max(...nums);const min=Math.min(...nums);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile spread operator in objects', async () => {
+      const code = 'const obj1={x:1,y:2};const obj2={...obj1,z:3};const merged={...obj1,...obj2};';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile mixed default and rest parameters', async () => {
+      const code = 'function fn(a=1,b=2,...rest){return a+b+rest.length;}const result=fn();';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+  });
+
   describe('Real-world scenarios', () => {
     it('should compile data processing pipeline', async () => {
       const code = `

@@ -35,6 +35,46 @@ When implementing new features or fixing bugs, you MUST follow Test-Driven Devel
    - Update CLAUDE.md if significant patterns or practices changed
    - Document any known limitations or complications discovered
 
+### ⚠️ MANDATORY 5-Point Testing Strategy
+
+**For EVERY feature implementation, you MUST create ALL five types of tests:**
+
+1. ✅ **Minimal test case** - Test the construct in isolation
+   - File: `src/__tests__/feature-name.test.ts`
+   - Example: `const arr1 = [1, 2, 3]; const arr2 = [...arr1, 4, 5];`
+   - Should verify basic functionality works correctly
+
+2. ✅ **Realistic test case** - Test the construct in realistic context
+   - File: Same feature test file
+   - Example: Real-world scenarios section showing actual use cases
+   - Should verify the feature works as users would actually use it
+
+3. ✅ **Edge cases** - Test nested, combined, and boundary conditions
+   - File: Same feature test file
+   - Example: Spread of spread, empty arrays, mixed types, etc.
+   - Should verify the feature handles unusual or complex scenarios
+
+4. ✅ **TypeScript compilation** - Verify TypeScript output compiles without errors
+   - File: `src/__tests__/typescript-compilation.test.ts`
+   - Add a test case in the appropriate Phase section
+   - Should verify generated TypeScript code is valid and compiles
+
+5. ✅ **Confidence scores** - Verify confidence scores are reasonable (≥0.7 for good inferences)
+   - File: `src/__tests__/confidence-scores.test.ts`
+   - Add tests checking confidence scores for the new feature
+   - Should verify type inference assigns appropriate confidence levels
+
+**FAILURE TO FOLLOW THIS STRATEGY IS UNACCEPTABLE**
+
+If you implement a feature without all 5 test types, you have NOT completed the task. Go back and add the missing tests before marking the feature as complete.
+
+**Example - Spread Operator Implementation:**
+1. ✅ Created `spread-operator.test.ts` with 29 tests (minimal + realistic + edge cases)
+2. ✅ Added 6 tests to `typescript-compilation.test.ts` Phase 3 section
+3. ✅ Added 5 tests to `confidence-scores.test.ts` Phase 3 section
+4. ✅ All 561+ tests passing, no regressions
+5. ✅ Feature marked complete in TODO.md
+
 ### Test Update Requirements
 
 **For existing functionality**:
