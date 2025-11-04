@@ -39,6 +39,16 @@ export const knownTypes: Map<string, string> = new Map([
   // Date static methods
   ['Date.now', 'number'],
   ['Date.parse', 'number'],
+  // Math static methods
+  ['Math.max', 'number'],
+  ['Math.min', 'number'],
+  ['Math.abs', 'number'],
+  ['Math.floor', 'number'],
+  ['Math.ceil', 'number'],
+  ['Math.round', 'number'],
+  ['Math.sqrt', 'number'],
+  ['Math.pow', 'number'],
+  ['Math.random', 'number'],
   // Type conversion functions
   ['parseInt', 'number'],
   ['parseFloat', 'number'],

@@ -402,21 +402,57 @@ export class TypeResolver implements ITypeResolver {
   private inferArrayType(node: t.ArrayExpression, typeMap: TypeMap, depth: number): InferredType {
     if (node.elements.length === 0) return { typeName: 'any[]', confidence: 0.7 };
 
-    const firstElement = node.elements[0];
-    if (!firstElement) return { typeName: 'any[]', confidence: 0.7 };
+    // Collect all element types, handling spread elements
+    const elementTypes: (InferredType | null)[] = [];
 
-    const firstType = this.inferTypeFromNode(firstElement, typeMap, depth);
-    if (!firstType || firstType.confidence < 0.7) return { typeName: 'any[]', confidence: 0.8 };
+    for (const element of node.elements) {
+      if (!element) {
+        elementTypes.push(null);
+        continue;
+      }
 
-    const allSameType = node.elements.every(el => {
-      if (!el) return true;
-      const elType = this.inferTypeFromNode(el, typeMap, depth);
-      return elType && elType.typeName === firstType.typeName;
-    });
+      if (t.isSpreadElement(element)) {
+        // Handle spread element - can look up in typeMap
+        let spreadArgType: InferredType | null = null;
 
-    return allSameType
-      ? { typeName: `${firstType.typeName}[]`, confidence: 0.9 }
-      : { typeName: 'any[]', confidence: 0.8 };
+        if (t.isIdentifier(element.argument)) {
+          // Look up the spread variable in typeMap
+          spreadArgType = typeMap.get(element.argument.name) || null;
+        } else {
+          // Infer from the expression
+          spreadArgType = this.inferTypeFromNode(element.argument, typeMap, depth);
+        }
+
+        if (spreadArgType && spreadArgType.typeName.endsWith('[]')) {
+          // Extract element type from array type (e.g., "number[]" -> "number")
+          const elementType = spreadArgType.typeName.slice(0, -2);
+          elementTypes.push({ typeName: elementType, confidence: spreadArgType.confidence });
+        } else {
+          elementTypes.push({ typeName: 'any', confidence: 0.3 });
+        }
+      } else {
+        // Regular element
+        const elementType = this.inferTypeFromNode(element, typeMap, depth);
+        elementTypes.push(elementType);
+      }
+    }
+
+    // Find the first valid type
+    const firstValidType = elementTypes.find(t => t && t.confidence > 0.7);
+
+    if (firstValidType) {
+      // Check if all elements have the same type
+      const allSameType = elementTypes.every(elementType => {
+        if (!elementType) return true;
+        return elementType.typeName === firstValidType.typeName;
+      });
+
+      if (allSameType) {
+        return { typeName: `${firstValidType.typeName}[]`, confidence: 0.9 };
+      }
+    }
+
+    return { typeName: 'any[]', confidence: 0.8 };
   }
 
   /**

@@ -189,20 +189,45 @@ export class TypeCollector implements ITypeCollector {
       return { typeName: 'any[]', confidence: 0.7 };
     }
 
-    const firstElementType = node.elements[0]
-      ? this.inferTypeFromNode(node.elements[0])
-      : null;
+    // Collect all element types, handling spread elements
+    const elementTypes: (InferredType | null)[] = [];
 
-    if (firstElementType && firstElementType.confidence > 0.7) {
-      const allSameType = node.elements.every(element => {
-        if (!element) return true;
+    for (const element of node.elements) {
+      if (!element) {
+        elementTypes.push(null);
+        continue;
+      }
+
+      if (t.isSpreadElement(element)) {
+        // Handle spread element - infer type of the spread argument
+        const spreadArgType = this.inferTypeFromNode(element.argument);
+        if (spreadArgType && spreadArgType.typeName.endsWith('[]')) {
+          // Extract element type from array type (e.g., "number[]" -> "number")
+          const elementType = spreadArgType.typeName.slice(0, -2);
+          elementTypes.push({ typeName: elementType, confidence: spreadArgType.confidence });
+        } else {
+          elementTypes.push({ typeName: 'any', confidence: 0.3 });
+        }
+      } else {
+        // Regular element
         const elementType = this.inferTypeFromNode(element);
-        return elementType && elementType.typeName === firstElementType.typeName;
+        elementTypes.push(elementType);
+      }
+    }
+
+    // Find the first valid type
+    const firstValidType = elementTypes.find(t => t && t.confidence > 0.7);
+
+    if (firstValidType) {
+      // Check if all elements have the same type
+      const allSameType = elementTypes.every(elementType => {
+        if (!elementType) return true;
+        return elementType.typeName === firstValidType.typeName;
       });
 
       if (allSameType) {
         return {
-          typeName: `${firstElementType.typeName}[]`,
+          typeName: `${firstValidType.typeName}[]`,
           confidence: 0.9
         };
       }
