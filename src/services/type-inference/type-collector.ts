@@ -28,6 +28,12 @@ export class TypeCollector implements ITypeCollector {
       },
       ArrowFunctionExpression: (path) => {
         this.handleArrowFunctionExpression(path, typeMap);
+      },
+      ClassDeclaration: (path) => {
+        this.handleClassDeclaration(path, typeMap);
+      },
+      ClassMethod: (path) => {
+        this.handleClassMethod(path, typeMap);
       }
     });
 
@@ -130,6 +136,143 @@ export class TypeCollector implements ITypeCollector {
         typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
       }
     });
+  }
+
+  /**
+   * Handle class declarations
+   */
+  private handleClassDeclaration(path: NodePath<t.ClassDeclaration>, typeMap: TypeMap): void {
+    if (path.node.id) {
+      const className = path.node.id.name;
+      typeMap.set(className, { typeName: 'class', confidence: 0.9 });
+    }
+  }
+
+  /**
+   * Handle class methods, including regular methods, static methods, getters, and setters
+   */
+  private handleClassMethod(path: NodePath<t.ClassMethod>, typeMap: TypeMap): void {
+    if (!t.isIdentifier(path.node.key)) {
+      return;
+    }
+
+    const methodName = path.node.key.name;
+
+    // Skip constructors (they're handled separately)
+    if (path.node.kind === 'constructor') {
+      // Add constructor parameters to typeMap
+      path.node.params.forEach(param => {
+        if (t.isIdentifier(param)) {
+          typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+        } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+          const paramName = param.left.name;
+          const inferredType = this.inferTypeFromNode(param.right);
+          if (inferredType) {
+            typeMap.set(paramName, inferredType);
+          } else {
+            typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+          }
+        } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+          const paramName = param.argument.name;
+          typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
+        }
+      });
+      return;
+    }
+
+    // Infer return type from method body
+    let returnType: InferredType | null = null;
+
+    if (path.node.kind === 'get') {
+      // Getter - infer return type from return statements
+      returnType = this.inferReturnTypeFromFunction(path.node);
+      if (returnType) {
+        typeMap.set(methodName, {
+          typeName: `() => ${returnType.typeName}`,
+          confidence: returnType.confidence
+        });
+      }
+    } else if (path.node.kind === 'set') {
+      // Setter - just add parameter type
+      path.node.params.forEach(param => {
+        if (t.isIdentifier(param)) {
+          typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+        }
+      });
+    } else {
+      // Regular or static method - infer full function signature
+      returnType = this.inferReturnTypeFromFunction(path.node);
+
+      // Build parameter types
+      const paramTypes: string[] = [];
+      path.node.params.forEach(param => {
+        if (t.isIdentifier(param)) {
+          paramTypes.push('any');
+          typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+        } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+          const paramName = param.left.name;
+          const inferredType = this.inferTypeFromNode(param.right);
+          if (inferredType) {
+            paramTypes.push(inferredType.typeName);
+            typeMap.set(paramName, inferredType);
+          } else {
+            paramTypes.push('any');
+            typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+          }
+        } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+          const paramName = param.argument.name;
+          paramTypes.push('...any[]');
+          typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
+        } else {
+          paramTypes.push('any');
+        }
+      });
+
+      const returnTypeStr = returnType ? returnType.typeName : 'void';
+      const confidence = returnType ? returnType.confidence : 0.9;
+
+      typeMap.set(methodName, {
+        typeName: `(${paramTypes.join(', ')}) => ${returnTypeStr}`,
+        confidence
+      });
+    }
+  }
+
+  /**
+   * Infer return type from a function or method by analyzing return statements
+   */
+  private inferReturnTypeFromFunction(func: t.Function): InferredType | null {
+    let returnType: InferredType | null = null;
+    let hasExplicitReturn = false;
+
+    if (!func.body || !t.isBlockStatement(func.body)) {
+      // Arrow function with expression body
+      if (t.isArrowFunctionExpression(func) && func.body) {
+        return this.inferTypeFromNode(func.body);
+      }
+      return null;
+    }
+
+    // Scan for return statements
+    traverse(func.body, {
+      ReturnStatement: (returnPath: any) => {
+        hasExplicitReturn = true;
+        if (returnPath.node.argument) {
+          const argType = this.inferTypeFromNode(returnPath.node.argument);
+          if (argType && (!returnType || argType.confidence > returnType.confidence)) {
+            returnType = argType;
+          }
+        }
+      },
+      noScope: true
+    });
+
+    // If no explicit return found, return type is void
+    if (!hasExplicitReturn) {
+      return { typeName: 'void', confidence: 0.9 };
+    }
+
+    return returnType;
   }
 
   /**
@@ -483,6 +626,15 @@ export class TypeCollector implements ITypeCollector {
       return { typeName: 'any', confidence: 0.3 };
     }
 
+    // If one operand is unknown (any with low confidence) and the other is known,
+    // prefer the known type with moderate confidence
+    if (leftType.typeName === 'any' && leftType.confidence < 0.5 && rightType.confidence >= 0.7) {
+      return { typeName: rightType.typeName, confidence: 0.7 };
+    }
+    if (rightType.typeName === 'any' && rightType.confidence < 0.5 && leftType.confidence >= 0.7) {
+      return { typeName: leftType.typeName, confidence: 0.7 };
+    }
+
     // Create union type or simplify if same type
     return this.createUnionType(leftType, rightType);
   }
@@ -516,8 +668,10 @@ export class TypeCollector implements ITypeCollector {
         return { typeName: 'number', confidence: 1.0 };
       }
 
-      // Otherwise, uncertain
-      return { typeName: 'any', confidence: 0.4 };
+      // Default to number for unknown operands (most common case in practice)
+      // This assumes arithmetic operations are more common than string concatenation
+      // when types are not explicitly known
+      return { typeName: 'number', confidence: 0.8 };
     }
 
     return { typeName: 'any', confidence: 0.3 };

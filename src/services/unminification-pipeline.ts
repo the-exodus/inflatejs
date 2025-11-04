@@ -321,13 +321,33 @@ export class UnminificationPipeline implements IUnminificationPipeline {
               if (parsedType) {
                 // Add parameter type annotations
                 member.params.forEach((param: any, index: number) => {
-                  if (t.isIdentifier(param) && parsedType.paramTypes[index]) {
+                  if (t.isIdentifier(param) && parsedType.paramTypes[index] && !param.typeAnnotation) {
                     param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(parsedType.paramTypes[index]);
+                  } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+                    // Handle default parameters
+                    const paramName = param.left.name;
+                    const paramType = typeMap.get(paramName);
+                    if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any' && !param.left.typeAnnotation) {
+                      param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+                    } else if (!param.left.typeAnnotation) {
+                      param.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+                    }
+                  } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+                    // Handle rest parameters
+                    const paramName = param.argument.name;
+                    const paramType = typeMap.get(paramName);
+                    if (paramType && paramType.confidence >= 0.7 && !param.typeAnnotation) {
+                      param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+                    } else if (!param.typeAnnotation) {
+                      param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any[]');
+                    }
                   }
                 });
 
                 // Add return type annotation
-                member.returnType = this.tsTypeBuilder.createTypeAnnotation(parsedType.returnType);
+                if (!member.returnType) {
+                  member.returnType = this.tsTypeBuilder.createTypeAnnotation(parsedType.returnType);
+                }
               }
             } else {
               // Add 'any' types to parameters without inferred types

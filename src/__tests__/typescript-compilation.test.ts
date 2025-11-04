@@ -314,4 +314,62 @@ describe('TypeScript Compilation Tests', () => {
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
   });
+
+  describe('Phase 4 Features', () => {
+    it('should compile basic class with methods', async () => {
+      const code = 'class Point{constructor(x,y){this.x=x;this.y=y;}distance(){return Math.sqrt(this.x*this.x+this.y*this.y);}}';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile class with static methods', async () => {
+      const code = 'class Calculator{static add(a,b){return a+b;}static multiply(a,b){return a*b;}}';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile class with getters and setters', async () => {
+      const code = 'class Counter{constructor(){this._count=0;}get count(){return this._count;}set count(v){this._count=v;}increment(){this._count++;}}';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile class inheritance', async () => {
+      const code = 'class Animal{speak(){return"sound";}}class Dog extends Animal{bark(){return"woof";}}';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile class with super call', async () => {
+      const code = 'class Point{constructor(x,y){this.x=x;this.y=y;}}class Point3D extends Point{constructor(x,y,z){super(x,y);this.z=z;}}';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile class with mixed parameter types', async () => {
+      const code = 'class Service{process(required,optional=10,...rest){return required+optional+rest.length;}}';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile class expression', async () => {
+      const code = 'const MyClass=class{getValue(){return 42;}};';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+  });
 });
