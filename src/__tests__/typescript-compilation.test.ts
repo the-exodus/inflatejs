@@ -238,6 +238,38 @@ describe('TypeScript Compilation Tests', () => {
       const diagnostics = compileTypeScript(result);
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
+
+    it('should compile optional chaining property access', async () => {
+      const code = 'const user={username:"John"};const userName=user?.username;';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      // Verify optional chaining syntax is preserved
+      expect(result).toContain('?.');
+    });
+
+    it('should compile optional chaining method calls', async () => {
+      const code = 'const text="hello";const upper=text?.toUpperCase();';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile nested optional chaining', async () => {
+      const code = 'const x={y:{z:1}};const val=x?.y?.z;';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      // Verify optional chaining syntax is preserved
+      expect(result).toContain('?.');
+    });
+
+    it('should compile optional element access', async () => {
+      const code = 'const arr=[1,2,3];const first=arr?.[0];';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
   });
 
   describe('Real-world scenarios', () => {

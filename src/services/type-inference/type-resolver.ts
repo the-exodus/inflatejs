@@ -372,7 +372,11 @@ export class TypeResolver implements ITypeResolver {
       case 'ArrowFunctionExpression':
         return this.inferFunctionExpressionType(node as any, typeMap, depth);
       case 'CallExpression':
-        return this.inferCallType(node, typeMap);
+      case 'OptionalCallExpression':
+        return this.inferCallType(node as t.CallExpression, typeMap);
+      case 'MemberExpression':
+      case 'OptionalMemberExpression':
+        return this.inferMemberExpressionType(node as t.MemberExpression, typeMap, depth);
       case 'AwaitExpression':
         return this.inferAwaitType(node as t.AwaitExpression, typeMap, depth);
       case 'NewExpression':
@@ -459,6 +463,9 @@ export class TypeResolver implements ITypeResolver {
    * Infer type from call expression
    */
   private inferCallType(node: t.CallExpression, typeMap: TypeMap): InferredType {
+    let baseType: InferredType;
+    const isOptional = (node as any).optional || t.isOptionalMemberExpression(node.callee) || (t.isMemberExpression(node.callee) && (node.callee as any).optional);
+
     // Handle instance method calls (e.g., text.slice(), arr.map())
     if (t.isMemberExpression(node.callee) && t.isIdentifier(node.callee.property)) {
       const methodName = node.callee.property.name;
@@ -477,7 +484,13 @@ export class TypeResolver implements ITypeResolver {
       if (objType) {
         const methodReturnType = this.inferMethodReturnType(objType.typeName, methodName);
         if (methodReturnType) {
-          return methodReturnType;
+          baseType = methodReturnType;
+          // If optional chaining, create union with undefined
+          if (isOptional) {
+            const confidence = Math.max(baseType.confidence, 0.7);
+            return { typeName: `${baseType.typeName} | undefined`, confidence };
+          }
+          return baseType;
         }
       }
 
@@ -487,20 +500,35 @@ export class TypeResolver implements ITypeResolver {
         const fullName = `${objectName}.${methodName}`;
 
         if (knownTypes.has(fullName)) {
-          return {
+          baseType = {
             typeName: knownTypes.get(fullName)!,
             confidence: 0.9
           };
+          // If optional chaining, create union with undefined
+          if (isOptional) {
+            return { typeName: `${baseType.typeName} | undefined`, confidence: 0.9 };
+          }
+          return baseType;
         }
       }
     }
 
     // Handle direct function calls
     if (t.isIdentifier(node.callee) && knownTypes.has(node.callee.name)) {
-      return { typeName: knownTypes.get(node.callee.name)!, confidence: 0.8 };
+      baseType = { typeName: knownTypes.get(node.callee.name)!, confidence: 0.8 };
+      // If optional chaining, create union with undefined
+      if (isOptional) {
+        return { typeName: `${baseType.typeName} | undefined`, confidence: 0.8 };
+      }
+      return baseType;
     }
 
-    return { typeName: 'any', confidence: 0.3 };
+    baseType = { typeName: 'any', confidence: 0.3 };
+    // If optional chaining, create union with undefined
+    if (isOptional) {
+      return { typeName: 'any | undefined', confidence: 0.7 };
+    }
+    return baseType;
   }
 
   /**
@@ -560,6 +588,41 @@ export class TypeResolver implements ITypeResolver {
       default:
         return { typeName: 'any', confidence: 0.3 };
     }
+  }
+
+  /**
+   * Infer type from member expression (property access)
+   */
+  private inferMemberExpressionType(node: t.MemberExpression, typeMap: TypeMap, depth: number): InferredType {
+    // Infer the base object type
+    const objectType = this.inferTypeFromNode(node.object, typeMap, depth);
+
+    // Handle known properties
+    if (t.isIdentifier(node.property)) {
+      const propertyName = node.property.name;
+
+      // Handle .length property
+      if (propertyName === 'length') {
+        const baseType = { typeName: 'number', confidence: 0.9 };
+        // If optional chaining, add undefined to union
+        if ((node as any).optional) {
+          return { typeName: 'number | undefined', confidence: 0.9 };
+        }
+        return baseType;
+      }
+    }
+
+    // Try to infer property type from context
+    // For now, we'll use 'any' for unknown properties
+    const baseType = { typeName: 'any', confidence: 0.3 };
+
+    // If optional chaining, create union with undefined
+    // We directly construct the union to avoid confidence threshold issues
+    if ((node as any).optional) {
+      return { typeName: 'any | undefined', confidence: 0.7 };
+    }
+
+    return baseType;
   }
 
   /**

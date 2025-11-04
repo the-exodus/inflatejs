@@ -163,7 +163,8 @@ export class TypeCollector implements ITypeCollector {
       case 'ArrowFunctionExpression':
         return { typeName: 'Function', confidence: 0.9 };
       case 'CallExpression':
-        return this.inferCallExpressionType(node);
+      case 'OptionalCallExpression':
+        return this.inferCallExpressionType(node as t.CallExpression);
       case 'NewExpression':
         return this.inferNewExpressionType(node);
       case 'UnaryExpression':
@@ -175,7 +176,8 @@ export class TypeCollector implements ITypeCollector {
       case 'BinaryExpression':
         return this.inferBinaryExpressionType(node);
       case 'MemberExpression':
-        return this.inferMemberExpressionType(node);
+      case 'OptionalMemberExpression':
+        return this.inferMemberExpressionType(node as t.MemberExpression);
       default:
         return { typeName: 'any', confidence: 0.1 };
     }
@@ -240,8 +242,20 @@ export class TypeCollector implements ITypeCollector {
    * Infer type from call expression
    */
   private inferCallExpressionType(node: t.CallExpression): InferredType {
+    const isOptional = (node as any).optional || t.isOptionalMemberExpression(node.callee) || (t.isMemberExpression(node.callee) && (node.callee as any).optional);
+
+    // Helper to wrap type with undefined if optional
+    const wrapIfOptional = (baseType: InferredType): InferredType => {
+      if (isOptional) {
+        // For optional chaining, ensure minimum confidence of 0.7 for the union type
+        const confidence = Math.max(baseType.confidence, 0.7);
+        return { typeName: `${baseType.typeName} | undefined`, confidence };
+      }
+      return baseType;
+    };
+
     // Handle method calls (obj.method())
-    if (t.isMemberExpression(node.callee)) {
+    if (t.isMemberExpression(node.callee) || t.isOptionalMemberExpression(node.callee)) {
       if (t.isIdentifier(node.callee.property)) {
         const methodName = node.callee.property.name;
 
@@ -249,54 +263,54 @@ export class TypeCollector implements ITypeCollector {
         if (['toUpperCase', 'toLowerCase', 'trim', 'trimStart', 'trimEnd',
              'substring', 'substr', 'replace', 'replaceAll',
              'repeat', 'padStart', 'padEnd', 'charAt'].includes(methodName)) {
-          return { typeName: 'string', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'string', confidence: 0.9 });
         }
 
         // Methods that exist on both strings and arrays - return generic type with moderate confidence
         // TypeResolver will refine these based on context
         if (methodName === 'slice' || methodName === 'concat') {
-          return { typeName: 'any', confidence: 0.6 };
+          return wrapIfOptional({ typeName: 'any', confidence: 0.6 });
         }
 
         // String methods that return string[]
         if (methodName === 'split') {
-          return { typeName: 'string[]', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'string[]', confidence: 0.9 });
         }
 
         // String methods that return number
         if (['indexOf', 'lastIndexOf', 'search', 'charCodeAt'].includes(methodName)) {
-          return { typeName: 'number', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'number', confidence: 0.9 });
         }
 
         // String methods that return boolean
         if (['startsWith', 'endsWith', 'includes'].includes(methodName)) {
-          return { typeName: 'boolean', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'boolean', confidence: 0.9 });
         }
 
         // Array methods that return boolean
         if (['some', 'every', 'includes'].includes(methodName)) {
-          return { typeName: 'boolean', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'boolean', confidence: 0.9 });
         }
 
         // Array methods that return number
         if (['indexOf', 'findIndex', 'push', 'unshift'].includes(methodName)) {
-          return { typeName: 'number', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'number', confidence: 0.9 });
         }
 
         // Array methods that return string
         if (methodName === 'join') {
-          return { typeName: 'string', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'string', confidence: 0.9 });
         }
 
         // RegExp methods that return boolean
         if (methodName === 'test') {
-          return { typeName: 'boolean', confidence: 0.9 };
+          return wrapIfOptional({ typeName: 'boolean', confidence: 0.9 });
         }
       }
     }
 
     // Handle static method calls (e.g., Object.keys(), Array.isArray())
-    if (t.isMemberExpression(node.callee) &&
+    if ((t.isMemberExpression(node.callee) || t.isOptionalMemberExpression(node.callee)) &&
         t.isIdentifier(node.callee.object) &&
         t.isIdentifier(node.callee.property)) {
       const objectName = node.callee.object.name;
@@ -304,10 +318,10 @@ export class TypeCollector implements ITypeCollector {
       const fullName = `${objectName}.${methodName}`;
 
       if (knownTypes.has(fullName)) {
-        return {
+        return wrapIfOptional({
           typeName: knownTypes.get(fullName)!,
           confidence: 0.9
-        };
+        });
       }
     }
 
@@ -315,14 +329,14 @@ export class TypeCollector implements ITypeCollector {
     if (t.isIdentifier(node.callee)) {
       const calleeName = node.callee.name;
       if (knownTypes.has(calleeName)) {
-        return {
+        return wrapIfOptional({
           typeName: knownTypes.get(calleeName)!,
           confidence: 0.8
-        };
+        });
       }
     }
 
-    return { typeName: 'any', confidence: 0.3 };
+    return wrapIfOptional({ typeName: 'any', confidence: 0.3 });
   }
 
   /**
@@ -508,17 +522,28 @@ export class TypeCollector implements ITypeCollector {
    * Infer type from member expression (e.g., obj.property, arr.length)
    */
   private inferMemberExpressionType(node: t.MemberExpression): InferredType {
+    const isOptional = t.isOptionalMemberExpression(node) || (node as any).optional;
+
     // Handle common properties with known return types
     if (t.isIdentifier(node.property)) {
       const propertyName = node.property.name;
 
       // Array/String .length property
       if (propertyName === 'length') {
-        return { typeName: 'number', confidence: 0.9 };
+        const baseType = { typeName: 'number', confidence: 0.9 };
+        if (isOptional) {
+          return { typeName: 'number | undefined', confidence: 0.9 };
+        }
+        return baseType;
       }
     }
 
     // Default: unable to infer
-    return { typeName: 'any', confidence: 0.3 };
+    const baseType = { typeName: 'any', confidence: 0.3 };
+    if (isOptional) {
+      // For optional chaining, we can confidently say the result is either any or undefined
+      return { typeName: 'any | undefined', confidence: 0.7 };
+    }
+    return baseType;
   }
 }

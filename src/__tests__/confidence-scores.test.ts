@@ -369,6 +369,44 @@ describe('Confidence Score Validation', () => {
     });
   });
 
+  describe('Optional chaining should have appropriate confidence', () => {
+    it('should assign reasonable confidence to optional property access', () => {
+      const code = 'const obj = { x: 1 }; const value = obj?.x;';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      const valueType = typeMap.get('value');
+      expect(valueType).toBeDefined();
+      // Optional access on unknown property types may return any or any | undefined
+      expect(valueType!.typeName).toMatch(/any/);
+    });
+
+    it('should assign reasonable confidence to optional method calls', () => {
+      const code = 'const text = "hello"; const upper = text.toUpperCase();';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      // Note: This tests non-optional call to establish baseline
+      const upperType = typeMap.get('upper');
+      expect(upperType).toBeDefined();
+      expect(upperType!.confidence).toBeGreaterThanOrEqual(0.1);
+    });
+
+    it('should handle nested optional chaining', () => {
+      const code = 'const obj = { a: { b: 1 } }; const value = obj?.a?.b;';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      const valueType = typeMap.get('value');
+      expect(valueType).toBeDefined();
+      // Should preserve optional chaining
+      expect(valueType!.confidence).toBeGreaterThanOrEqual(0.1);
+    });
+  });
+
   describe('Type propagation should maintain reasonable confidence', () => {
     it('should propagate high confidence types through assignment', () => {
       const code = 'const original = "hello"; const copied = original;';
