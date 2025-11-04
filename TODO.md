@@ -663,8 +663,8 @@ const port = process.env.PORT ?? 3000;
 - ✅ Methods with default parameters, rest parameters, and mixed types
 - ✅ Method return types: literals, objects, arrays, boolean, void, union types
 - ✅ Binary and logical expression handling in methods
-- ⚠️ Known limitation: Getters returning `this.property` have low confidence without property tracking
-- ⚠️ Known limitation: Methods with complex callback inference (like `reduce`) may have lower confidence
+- ⚠️ Known limitation: Getters returning `this.property` have low confidence without property tracking (see item #32)
+- ⚠️ Known limitation: Methods with complex callback inference (like `reduce`) may have lower confidence (see item #27)
 
 **Examples for tests:**
 ```javascript
@@ -901,7 +901,125 @@ const value = counter();
 // Expected: value: number (if count type is tracked)
 ```
 
-### 32. Union Types from Conditionals
+### 32. Class Property Tracking
+**Impact**: Medium-High (significantly improves class feature inference)
+**Effort**: Very High (3-4 hours - requires architectural changes)
+
+**Why needed**: Currently, getters and methods that return `this.property` cannot infer accurate types because property types are not tracked across the class scope. This limits the usefulness of class feature inference (item #21).
+
+**Dependencies**: Will be significantly helped by type narrowing (item #26) implementation, which provides control flow analysis that can track property assignments.
+
+**What's needed**:
+1. Class-level property type map to track property assignments
+2. Track property declarations (e.g., `x: number;`)
+3. Track constructor assignments (e.g., `this.x = x;`)
+4. Track method assignments (e.g., `this.count++;`)
+5. Resolve `this.property` expressions using the property type map
+6. Handle property reassignments with different types
+7. Support property type narrowing in conditional branches
+
+**Examples for tests:**
+```javascript
+// Constructor property assignment
+class User {
+  constructor(name, age) {
+    this._name = name;  // Should track: _name from parameter
+    this._age = age;    // Should track: _age from parameter
+  }
+
+  get name() {
+    return this._name;  // Should infer: () => any (from parameter)
+  }
+
+  get age() {
+    return this._age;   // Should infer: () => any (from parameter)
+  }
+}
+// Expected: name getter should return type of _name property
+
+// Property declaration
+class Counter {
+  _count = 0;  // Property declaration with literal
+
+  get count() {
+    return this._count;  // Should infer: () => number
+  }
+
+  increment() {
+    this._count++;       // Tracks mutation
+    return this._count;  // Should infer: () => number
+  }
+}
+// Expected: count getter should return number
+
+// Multiple assignments
+class State {
+  constructor(initial) {
+    this.value = initial;  // Assignment from parameter
+  }
+
+  reset() {
+    this.value = 0;        // Assignment with literal
+  }
+
+  clear() {
+    this.value = "";       // Assignment with different type
+  }
+
+  getValue() {
+    return this.value;     // Should infer: () => any (mixed types)
+  }
+}
+// Expected: getValue should return union type or any
+
+// With type narrowing (future enhancement)
+class Optional {
+  constructor(value) {
+    this._value = value;
+  }
+
+  hasValue() {
+    return this._value !== null;
+  }
+
+  getValue() {
+    if (this.hasValue()) {
+      return this._value;  // Narrowed to non-null
+    }
+    throw new Error("No value");
+  }
+}
+// Expected: After type narrowing, getValue could infer more specific type
+```
+
+**Implementation approach**:
+1. Add `classPropertyTypes: Map<string, Map<string, InferredType>>` to TypeCollector
+2. During ClassDeclaration traversal:
+   - Create property map for the class
+   - Track ClassProperty nodes (property declarations)
+   - Track constructor assignments (`this.x = value`)
+   - Track method assignments to `this.property`
+3. Enhance MemberExpression inference:
+   - When `object` is `ThisExpression`, lookup property type
+   - Requires tracking "current class context" during traversal
+4. Handle property reassignments:
+   - Multiple assignments with same type → keep that type
+   - Multiple assignments with different types → union type or `any`
+5. Integration with type narrowing (future):
+   - Use control flow analysis to track property type changes
+   - Support conditional narrowing (e.g., `if (this.value !== null)`)
+
+**Current limitations (from item #21):**
+- Getters returning `this.property` have low confidence
+- Methods returning `this.property` cannot infer accurate types
+- Property mutations not tracked across methods
+
+**Related items:**
+- Item #21 (Class Features) - Currently limited by lack of property tracking
+- Item #26 (Type Narrowing) - Will provide control flow analysis for property tracking
+- Item #30 (this Context) - Related to understanding `this.property` access
+
+### 33. Union Types from Conditionals
 **Impact**: Medium (improves accuracy)
 **Effort**: High (2 hours)
 
@@ -1006,6 +1124,12 @@ For each TODO item:
 16. Class features ✅
 17. Callback type inference
 18. Type narrowing
+
+### Phase 5 (3-4 hours): Type System Enhancements
+19. Class property tracking (item #32) - Depends on type narrowing
+    - Significantly improves class getter/method inference
+    - Tracks `this.property` assignments across class scope
+    - Integrates with type narrowing for conditional property types
 
 ---
 
