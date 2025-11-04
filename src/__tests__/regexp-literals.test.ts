@@ -168,9 +168,8 @@ describe('RegExp literal type inference', () => {
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       expect(result).toMatch(/pattern:\s*RegExp/);
-      // TODO: exec() return type not in known types - should be RegExpExecArray | null
-      // Currently returns no type annotation
-      expect(result).toContain('const match');
+      // exec() now returns RegExpExecArray | null
+      expect(result).toMatch(/match:\s*(RegExpExecArray \| null|null \| RegExpExecArray)/);
     });
   });
 

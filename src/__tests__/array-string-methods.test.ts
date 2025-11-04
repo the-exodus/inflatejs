@@ -20,9 +20,8 @@ describe('Array method type inference', () => {
       const code = 'const numbers=[1,2,3,4,5];const found=numbers.find(n=>n>3);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: find() return type inference not yet implemented - should infer number | undefined
-      // Currently returns no type annotation
-      expect(result).toContain('const found');
+      // find() now returns element type | undefined
+      expect(result).toMatch(/found:\s*(number \| undefined|undefined \| number)/);
     });
 
     it('should infer boolean for some', async () => {
@@ -66,9 +65,8 @@ describe('Array method type inference', () => {
       const code = 'const arr=[1,2,3];const result=arr.flatMap(x=>[x,x*2]);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: flatMap() return type inference not yet implemented - should infer number[]
-      // Currently returns no type annotation
-      expect(result).toContain('const result');
+      // flatMap() now returns the same array type
+      expect(result).toMatch(/result:\s*number\[\]/);
     });
 
     it('should infer array type for slice', async () => {
@@ -96,18 +94,16 @@ describe('Array method type inference', () => {
       const code = 'const arr=[1,2,3];const last=arr.pop();';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: pop() return type inference not yet implemented - should infer number | undefined
-      // Currently returns no type annotation
-      expect(result).toContain('const last');
+      // pop() now returns element type | undefined
+      expect(result).toMatch(/last:\s*(number \| undefined|undefined \| number)/);
     });
 
     it('should infer element type for shift', async () => {
       const code = 'const arr=[1,2,3];const first=arr.shift();';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: shift() return type inference not yet implemented - should infer number | undefined
-      // Currently returns no type annotation
-      expect(result).toContain('const first');
+      // shift() now returns element type | undefined
+      expect(result).toMatch(/first:\s*(number \| undefined|undefined \| number)/);
     });
 
     it('should infer number for unshift', async () => {

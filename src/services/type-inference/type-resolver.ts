@@ -290,8 +290,19 @@ export class TypeResolver implements ITypeResolver {
     }
 
     if (objType.includes('[]')) {
+      // Extract element type from array type (e.g., "number[]" -> "number")
+      const elementType = objType.slice(0, -2);
+
       // Methods that return the same array type
       if (['map', 'filter', 'slice', 'concat', 'reverse', 'sort', 'flat'].includes(methodName)) {
+        return { typeName: objType, confidence: 0.9 };
+      }
+      // Methods that return element type | undefined
+      if (['pop', 'shift', 'find'].includes(methodName)) {
+        return { typeName: `${elementType} | undefined`, confidence: 0.9 };
+      }
+      // flatMap returns flattened array
+      if (methodName === 'flatMap') {
         return { typeName: objType, confidence: 0.9 };
       }
       // Methods that return string
@@ -312,6 +323,10 @@ export class TypeResolver implements ITypeResolver {
       // Methods that return boolean
       if (methodName === 'test') {
         return { typeName: 'boolean', confidence: 0.9 };
+      }
+      // exec returns RegExpExecArray | null
+      if (methodName === 'exec') {
+        return { typeName: 'RegExpExecArray | null', confidence: 0.9 };
       }
     }
 

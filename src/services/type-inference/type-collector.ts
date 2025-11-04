@@ -306,6 +306,11 @@ export class TypeCollector implements ITypeCollector {
         if (methodName === 'test') {
           return wrapIfOptional({ typeName: 'boolean', confidence: 0.9 });
         }
+
+        // RegExp methods that return RegExpExecArray | null
+        if (methodName === 'exec') {
+          return wrapIfOptional({ typeName: 'RegExpExecArray | null', confidence: 0.9 });
+        }
       }
     }
 
