@@ -121,9 +121,9 @@ describe('Spread Operator', () => {
       const code = 'const clone=arr=>[...arr];';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: Arrow function return type inference not yet implemented
-      // Should verify: expect(result).toMatch(/clone:\s*.*Function/)
-      expect(result).toMatch(/clone:\s*Function/);
+      // Arrow function return types are now inferred
+      // Should see function signature with return type
+      expect(result).toMatch(/clone:\s*\(.+\)\s*=>/);
       expect(result).toMatch(/\[\.\.\./);
     });
 

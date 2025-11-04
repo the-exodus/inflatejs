@@ -161,7 +161,7 @@ export class TypeCollector implements ITypeCollector {
         return { typeName: 'object', confidence: 0.8 };
       case 'FunctionExpression':
       case 'ArrowFunctionExpression':
-        return { typeName: 'Function', confidence: 0.9 };
+        return this.inferFunctionExpressionType(node as t.FunctionExpression | t.ArrowFunctionExpression);
       case 'CallExpression':
       case 'OptionalCallExpression':
         return this.inferCallExpressionType(node as t.CallExpression);
@@ -550,5 +550,49 @@ export class TypeCollector implements ITypeCollector {
       return { typeName: 'any | undefined', confidence: 0.7 };
     }
     return baseType;
+  }
+
+  /**
+   * Infer type signature for function/arrow function expressions
+   * Returns full function signature with parameter and return types
+   */
+  private inferFunctionExpressionType(
+    node: t.FunctionExpression | t.ArrowFunctionExpression
+  ): InferredType {
+    // Get parameter types (basic inference for now)
+    const paramTypes = node.params.map(param => {
+      if (t.isIdentifier(param)) {
+        return 'any';
+      } else if (t.isAssignmentPattern(param)) {
+        // Default parameter - try to infer from default value
+        const defaultType = this.inferTypeFromNode(param.right);
+        return defaultType ? defaultType.typeName : 'any';
+      } else if (t.isRestElement(param)) {
+        return 'any[]';
+      }
+      return 'any';
+    });
+
+    // Try to infer return type from the function body
+    let returnType: InferredType = { typeName: 'any', confidence: 0.5 };
+
+    if (t.isBlockStatement(node.body)) {
+      // Look for return statements
+      for (const stmt of node.body.body) {
+        if (t.isReturnStatement(stmt) && stmt.argument) {
+          const argType = this.inferTypeFromNode(stmt.argument);
+          if (argType && argType.confidence > returnType.confidence) {
+            returnType = argType;
+          }
+        }
+      }
+    } else {
+      // Arrow function with expression body
+      returnType = this.inferTypeFromNode(node.body) || returnType;
+    }
+
+    // Build function signature
+    const typeStr = `(${paramTypes.join(', ')}) => ${returnType.typeName}`;
+    return { typeName: typeStr, confidence: Math.min(0.8, returnType.confidence) };
   }
 }

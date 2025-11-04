@@ -100,9 +100,9 @@ describe('RegExp literal type inference', () => {
       const code = 'const getRegex=()=>/\\d+/;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: Arrow function return type annotations not yet implemented
-      // Currently infers Function type for the variable but not the specific return type
-      expect(result).toMatch(/getRegex:\s*Function/);
+      // Arrow function return type annotations are now implemented
+      // Should infer () => RegExp
+      expect(result).toMatch(/getRegex:\s*\(\)\s*=>\s*RegExp/);
     });
   });
 
