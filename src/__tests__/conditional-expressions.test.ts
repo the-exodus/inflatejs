@@ -34,8 +34,8 @@ describe('Conditional expression type inference', () => {
       const code = 'const flag=true;const result=flag?"text":42;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Should have some type annotation (may be 'any' for mixed types)
-      expect(result).toContain('const');
+      // When branches have different types, should infer union type
+      expect(result).toMatch(/result:\s*(string \| number|number \| string)/);
     });
   });
 
@@ -68,7 +68,7 @@ describe('Conditional expression type inference', () => {
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       // Both branches are strings (method call on string literal + string literal)
-      expect(result).toContain('const');
+      expect(result).toMatch(/result:\s*string/);
     });
 
     it('should infer string type for ternary with method call on variable', async () => {

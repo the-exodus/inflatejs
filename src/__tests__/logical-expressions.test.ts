@@ -35,16 +35,17 @@ describe('Logical expression type inference', () => {
       const code = 'const flag=true;const result=flag||42;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // May be inferred as 'any' or union type
-      expect(result).toContain('const');
+      // Should infer union type for OR with different types
+      expect(result).toMatch(/result:\s*(boolean \| number|number \| boolean)/);
     });
 
     it('should handle OR with mixed literal types', async () => {
       const code = 'const result="text"||123;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // May be inferred as 'any' or union type
-      expect(result).toContain('const');
+      // Nullish types mixed with other types, confidence too low for proper type inference
+      // TODO: Should infer string | number when union types are properly supported
+      expect(result).toContain('const result');
     });
   });
 
@@ -96,38 +97,45 @@ describe('Logical expression type inference', () => {
 
   describe('AND operator (&&) - different types', () => {
     it('should handle AND with boolean and string', async () => {
-      const code = 'const flag=true;const result=flag&&"success";';
+      const code = 'const flag=true;const result=flag&&"yes";';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // May be inferred as 'any' or union type
-      expect(result).toContain('const');
+      // AND with boolean and string - returns string if flag is true, boolean (false) if falsy
+      // Type inference doesn't track return type of logical AND with different types (confidence too low)
+      // TODO: Should infer boolean | string when union types are properly supported
+      expect(result).toContain('const result');
     });
 
     it('should handle AND with boolean and number', async () => {
       const code = 'const flag=true;const result=flag&&42;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // May be inferred as 'any' or union type
-      expect(result).toContain('const');
+      // AND with boolean and number - returns number if flag is true, boolean (false) if falsy
+      // Type inference doesn't track return type of logical AND with different types (confidence too low)
+      // TODO: Should infer boolean | number when union types are properly supported
+      expect(result).toContain('const result');
     });
   });
 
   describe('AND operator (&&) - conditional execution patterns', () => {
     it('should infer type from method call after AND', async () => {
-      const code = 'const text="hello";const result=text&&text.toUpperCase();';
+      const code = 'const str="hello";const result=str&&str.toUpperCase();';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Identifier resolution during initial pass is limited
-      // TypeResolver should handle this in multi-pass, but may not always reach confidence threshold
-      expect(result).toContain('const');
+      // str && str.toUpperCase() - Method call returns string, BUT logical AND with string literal falsy value
+      // Type inference doesn't track the result type properly (should be string | false)
+      // TODO: Should infer string when the method return type is properly propagated through logical AND
+      expect(result).toContain('const result');
     });
 
     it('should handle AND with function call', async () => {
-      const code = 'function getValue(){return 42}const flag=true;const result=flag&&getValue();';
+      const code = 'const getValue=()=>42;const result=true&&getValue();';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Function return type may or may not be inferred
-      expect(result).toContain('const');
+      // true && getValue() - Function call returns number, but logical AND with boolean true
+      // Type inference doesn't track return type (should be number | false)
+      // TODO: Should infer number when function return type is properly propagated through logical AND
+      expect(result).toContain('const result');
     });
   });
 
@@ -136,24 +144,30 @@ describe('Logical expression type inference', () => {
       const code = 'const input=null;const value=input??"default";';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Nullish coalescing may or may not be supported depending on parser config
-      expect(result).toContain('const');
+      // Nullish coalescing is parsed correctly, but the result type isn't being inferred
+      // The right side is a string literal, so result should be inferred as string
+      // TODO: Should infer string when nullish coalescing result type propagation is implemented
+      expect(result).toContain('const value');
     });
 
     it('should infer number when both sides are numbers', async () => {
       const code = 'const count=null;const value=count??0;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Nullish coalescing may or may not be supported
-      expect(result).toContain('const');
+      // Nullish coalescing with null ?? number literal
+      // Should infer number as the result type
+      // TODO: Should infer number when nullish coalescing result type propagation is implemented
+      expect(result).toContain('const value');
     });
 
     it('should handle nullish coalescing with different types', async () => {
       const code = 'const input=null;const value=input??42;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Nullish coalescing may or may not be supported
-      expect(result).toContain('const');
+      // Nullish coalescing with null ?? number literal
+      // Should infer number as the result type
+      // TODO: Should infer number when nullish coalescing result type propagation is implemented
+      expect(result).toContain('const value');
     });
   });
 
@@ -162,25 +176,30 @@ describe('Logical expression type inference', () => {
       const code = 'function getName(user){return user||"Guest"}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Return type depends on parameter type inference
-      expect(result).toContain('function');
+      // Function parameter 'user' is inferred as 'any' (no usage context)
+      // Return type depends on: any || "Guest" - which would be any
+      // This is expected because the parameter type is 'any' from unknown usage
+      expect(result).toContain('user: any');
     });
 
     it('should infer return type from AND expression', async () => {
       const code = 'function process(flag){return flag&&"done"}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Return type depends on parameter type inference
-      expect(result).toContain('function');
+      // Function parameter 'flag' is inferred as 'any' (no usage context)
+      // Return type depends on: any && "done" - which would be any | string
+      // This is expected because the parameter type is 'any' from unknown usage
+      expect(result).toContain('flag: any');
     });
 
     it('should infer string return type from OR with string literals', async () => {
       const code = 'function getStatus(active){return active&&"active"||"inactive"}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // The parameter 'active' has type 'any', so nested logical expressions with it
-      // will also infer as 'any' - this is expected behavior
-      expect(result).toContain('function');
+      // Function parameter 'active' is inferred as 'any' (no usage context)
+      // The nested logical expression (active && "active") || "inactive" would infer as any | string | string = any
+      // This is expected because the parameter type is 'any' from unknown usage
+      expect(result).toContain('active: any');
     });
   });
 

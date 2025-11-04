@@ -11,15 +11,18 @@ describe('Array method type inference', () => {
       const code = 'const numbers=[1,2,3,4,5];const sum=numbers.reduce((acc,n)=>acc+n,0);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // reduce can return various types, often inferred from initial value
-      expect(result).toContain('const');
+      // TODO: reduce() return type inference not yet implemented - should infer number from initial value
+      // Currently returns no type annotation
+      expect(result).toContain('const sum');
     });
 
     it('should infer type for find', async () => {
       const code = 'const numbers=[1,2,3,4,5];const found=numbers.find(n=>n>3);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toContain('const');
+      // TODO: find() return type inference not yet implemented - should infer number | undefined
+      // Currently returns no type annotation
+      expect(result).toContain('const found');
     });
 
     it('should infer boolean for some', async () => {
@@ -63,7 +66,9 @@ describe('Array method type inference', () => {
       const code = 'const arr=[1,2,3];const result=arr.flatMap(x=>[x,x*2]);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toContain('result');
+      // TODO: flatMap() return type inference not yet implemented - should infer number[]
+      // Currently returns no type annotation
+      expect(result).toContain('const result');
     });
 
     it('should infer array type for slice', async () => {
@@ -91,15 +96,18 @@ describe('Array method type inference', () => {
       const code = 'const arr=[1,2,3];const last=arr.pop();';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // pop returns element type or undefined
-      expect(result).toContain('last');
+      // TODO: pop() return type inference not yet implemented - should infer number | undefined
+      // Currently returns no type annotation
+      expect(result).toContain('const last');
     });
 
     it('should infer element type for shift', async () => {
       const code = 'const arr=[1,2,3];const first=arr.shift();';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toContain('first');
+      // TODO: shift() return type inference not yet implemented - should infer number | undefined
+      // Currently returns no type annotation
+      expect(result).toContain('const first');
     });
 
     it('should infer number for unshift', async () => {

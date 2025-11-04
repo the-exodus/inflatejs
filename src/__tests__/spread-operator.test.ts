@@ -66,7 +66,9 @@ describe('Spread Operator', () => {
       const code = 'const a={x:1};const b={y:2};const c={...a,...b,z:3};';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
+      // variable renaming produces variable, variable2, variable3
       expect(result).toMatch(/variable3:\s*object/);
+      expect(result).toMatch(/\.\.\./);
     });
 
     it('should handle object spread with no additional properties', async () => {
@@ -119,8 +121,10 @@ describe('Spread Operator', () => {
       const code = 'const clone=arr=>[...arr];';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Should compile without errors
-      expect(result).toBeTruthy();
+      // TODO: Arrow function return type inference not yet implemented
+      // Should verify: expect(result).toMatch(/clone:\s*.*Function/)
+      expect(result).toMatch(/clone:\s*Function/);
+      expect(result).toMatch(/\[\.\.\./);
     });
 
     it('should handle spread with different types', async () => {
@@ -135,7 +139,9 @@ describe('Spread Operator', () => {
       const code = 'const inner=[1,2];const outer=[[...inner],3];';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      expect(result).toMatch(/inner:\s*number\[\]/);
+      // outer becomes any[] because it contains heterogeneous elements (array and number)
+      expect(result).toMatch(/outer:\s*any\[\]/);
     });
   });
 
@@ -144,14 +150,20 @@ describe('Spread Operator', () => {
       const code = 'const arr=[1,2];const more=[3,4];arr.push(...more);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // push() mutates the array in-place and returns a number, not a type to check on arr
+      expect(result).toMatch(/arr:\s*number\[\]/);
+      expect(result).toMatch(/more:\s*number\[\]/);
+      expect(result).toMatch(/\.push\(\.\.\./);
     });
 
     it('should handle spread with unshift', async () => {
       const code = 'const arr=[3,4];const prefix=[1,2];arr.unshift(...prefix);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // unshift() mutates the array in-place and returns a number, not a type to check on arr
+      expect(result).toMatch(/arr:\s*number\[\]/);
+      expect(result).toMatch(/prefix:\s*number\[\]/);
+      expect(result).toMatch(/\.unshift\(\.\.\./);
     });
   });
 
@@ -160,6 +172,10 @@ describe('Spread Operator', () => {
       const code = 'const a=[1];const b=[...a];const c=[...b];';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
+      // variable gets renamed to: variable, variable2, variable3
+      // spread preserves the type through multiple levels
+      expect(result).toMatch(/variable:\s*number\[\]/);
+      expect(result).toMatch(/variable2:\s*number\[\]/);
       expect(result).toMatch(/variable3:\s*number\[\]/);
     });
 
@@ -174,7 +190,10 @@ describe('Spread Operator', () => {
       const code = 'const args=[1,2];console.log(`Values:`,...args);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // console.log returns void, but we can verify args is properly typed
+      expect(result).toMatch(/args:\s*number\[\]/);
+      expect(result).toMatch(/console\.log\(`Values:`/);
+      expect(result).toMatch(/\.\.\./);
     });
 
     it('should handle object spread with computed keys', async () => {
@@ -218,7 +237,11 @@ describe('Spread Operator', () => {
       const code = 'function sum(...nums){return nums.reduce((a,b)=>a+b,0);}const arr=[1,2,3];const total=sum(...arr);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // arr should be inferred as number[], spread params in function call work
+      expect(result).toMatch(/arr:\s*number\[\]/);
+      expect(result).toMatch(/\.reduce\(/);
+      // total type inference from function return is limited, but code should be syntactically correct
+      expect(result).toMatch(/total\s*=/);
     });
 
     it('should handle array prepend/append', async () => {

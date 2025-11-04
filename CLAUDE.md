@@ -111,6 +111,116 @@ If you implement a feature without all 5 test types, you have NOT completed the 
 4. Adjusted 4 tests with overly strict expectations
 5. Ran tests - all 30 passed ✅
 
+### ⚠️ CRITICAL: Test Quality Requirements
+
+**TESTS MUST VERIFY WHAT THEY CLAIM TO TEST**
+
+This is absolutely critical: **tests must check for actual type inference, not just syntax preservation or code compilation.**
+
+#### ❌ BAD TESTS - DO NOT WRITE TESTS LIKE THESE:
+
+```typescript
+// ❌ BAD: Only checks syntax exists, doesn't verify type inference
+it('should infer union type for optional property access', async () => {
+  const code = 'const user={name:"John"};const userName=user?.name;';
+  const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+  expect(result).toContain('?.');  // ❌ Only checks syntax!
+  expect(result).toBeTruthy();     // ❌ Meaningless assertion!
+});
+
+// ❌ BAD: Only checks that code compiles, doesn't verify types
+it('should handle spread in arrow function', async () => {
+  const code = 'const clone=arr=>[...arr];';
+  const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+  expect(result).toBeTruthy();     // ❌ Doesn't verify anything useful!
+});
+
+// ❌ BAD: Only checks for generic keyword, not actual type
+it('should handle AND with boolean and string', async () => {
+  const code = 'const flag=true;const result=flag&&"yes";';
+  const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+  expect(result).toContain('const');  // ❌ Every test would pass this!
+});
+```
+
+#### ✅ GOOD TESTS - WRITE TESTS LIKE THESE:
+
+```typescript
+// ✅ GOOD: Checks for actual type annotation
+it('should infer union type for optional property access', async () => {
+  const code = 'const user={name:"John"};const userName=user?.name;';
+  const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+  // Verify actual type inference - union type with undefined
+  expect(result).toMatch(/userName:\s*(any \| undefined|undefined \| any)/);
+});
+
+// ✅ GOOD: Checks for actual function type when possible
+it('should handle spread in arrow function', async () => {
+  const code = 'const clone=arr=>[...arr];';
+  const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+  // Arrow function return types not yet implemented - document this
+  // TODO: Arrow function return type inference not yet implemented
+  // When implemented, should check: expect(result).toMatch(/clone:\s*\(.*\)\s*=>/);
+  expect(result).toMatch(/clone:\s*Function/);
+  expect(result).toContain('[...arr]');  // Verify spread syntax preserved
+});
+
+// ✅ GOOD: Checks for specific union type
+it('should handle AND with boolean and string', async () => {
+  const code = 'const flag=true;const result=flag&&"yes";';
+  const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+  // Union type inference not yet fully supported for logical expressions
+  // TODO: Should infer boolean | string when union types are properly supported
+  expect(result).toContain('const result');  // At minimum, verify variable exists
+});
+```
+
+#### Rules for Writing Tests:
+
+1. **ALWAYS test for actual type annotations** when the feature claims to infer types
+   - Use regex patterns like: `/variableName:\s*expectedType/`
+   - Example: `expect(result).toMatch(/userName:\s*string/)`
+
+2. **NEVER use vague assertions** like:
+   - ❌ `expect(result).toBeTruthy()` - This passes for ANY non-empty string
+   - ❌ `expect(result).toContain('const')` - This passes for ANY code with variables
+   - ❌ `expect(result).toContain('?.')` - Only checks syntax, not types
+
+3. **For unimplemented functionality**, add explicit TODO comments:
+   ```typescript
+   // TODO: Nullish coalescing type inference not yet implemented
+   // When implemented, should check: expect(result).toMatch(/name:\s*string/);
+   expect(result).toContain('??');  // At minimum verify syntax is preserved
+   ```
+
+4. **Reference TODO.md items** when tests are relaxed:
+   ```typescript
+   // TODO: See TODO.md item #27 - Callback return type inference
+   // Should infer number[] but currently infers any[]
+   expect(result).toMatch(/result:\s*(number\[\]|any\[\])/);
+   ```
+
+5. **Test what IS working**, not what isn't:
+   - If you can't infer the exact type yet, test for `any` or basic type
+   - Document what SHOULD happen when functionality is added
+
+#### Before Submitting Tests:
+
+Run this mental checklist:
+1. ✅ Does this test verify actual type inference (type annotations in output)?
+2. ✅ If the test passes with wrong types, would it still pass? (If yes, test is too weak)
+3. ✅ Does the test name match what it actually tests?
+4. ✅ Are relaxed tests documented with TODO comments explaining why?
+5. ✅ Will a future developer understand what this test is validating?
+
+**If you answer "no" to any of these, FIX THE TEST before continuing.**
+
 ### Discovering Complications During TDD
 
 When implementing features, you may discover complications (like the `slice()` method ambiguity). When this happens:

@@ -122,21 +122,29 @@ describe('Optional Chaining', () => {
       const code = 'const obj={val:10};const result=obj?.val?obj.val:0;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // Optional chaining syntax should be preserved
+      expect(result).toContain('?.');
+      // TODO: Type inference for ternary + optional chaining has low confidence due to complexity
+      // When improved, should check: expect(result).toMatch(/result:\s*(number|any)/);
     });
 
     it('should handle optional chaining with nullish coalescing', async () => {
       const code = 'const obj={name:"John"};const name=obj?.name??"default";';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // Both ?. and ?? syntax should be preserved
+      expect(result).toContain('?.');
+      expect(result).toContain('??');
+      // TODO: Nullish coalescing type inference not yet implemented
+      // When implemented, should check: expect(result).toMatch(/name:\s*string/);
     });
 
     it('should handle optional chaining in function argument', async () => {
       const code = 'function log(val){return val;}const obj={msg:"test"};const result=log(obj?.msg);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // Should infer union type when optional value is passed as argument
+      expect(result).toMatch(/result:\s*(any \| undefined|undefined \| any)/);
     });
   });
 
@@ -221,14 +229,19 @@ describe('Optional Chaining', () => {
       const code = 'const elem={parent:{classList:{add:()=>{}}}};const result=elem?.parent?.classList?.add("active");';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // Should infer union type for method call with optional chaining
+      expect(result).toMatch(/result:\s*(any \| undefined|undefined \| any)/);
     });
 
     it('should handle config object access', async () => {
       const code = 'const config={server:{port:3000}};const port=config?.server?.port??8080;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toBeTruthy();
+      // Optional chaining and nullish coalescing syntax should be preserved
+      expect(result).toContain('?.');
+      expect(result).toContain('??');
+      // TODO: Nullish coalescing type inference not yet implemented
+      // When implemented, should check: expect(result).toMatch(/port:\s*number/);
     });
   });
 
@@ -237,9 +250,9 @@ describe('Optional Chaining', () => {
       const code = 'const obj={x:1};const val=obj?.x;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Should contain optional chaining syntax
+      // Should contain optional chaining syntax and type annotation
       expect(result).toContain('?.');
-      expect(result).toBeTruthy();
+      expect(result).toMatch(/val:\s*(any \| undefined|undefined \| any)/);
     });
 
     it('should preserve optional chaining in output', async () => {

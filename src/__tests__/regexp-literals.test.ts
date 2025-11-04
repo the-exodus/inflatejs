@@ -85,9 +85,8 @@ describe('RegExp literal type inference', () => {
       const code = 'function test(pattern=/\\d+/){return pattern}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Default parameters are not explicitly typed in current implementation
-      // But the RegExp literal itself should be recognized
-      expect(result).toContain('function');
+      // Default parameter types ARE inferred - parameter gets RegExp type annotation
+      expect(result).toMatch(/pattern:\s*RegExp/);
     });
 
     it('should infer RegExp return type', async () => {
@@ -101,8 +100,9 @@ describe('RegExp literal type inference', () => {
       const code = 'const getRegex=()=>/\\d+/;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // getRegex should have function type that returns RegExp
-      expect(result).toContain('const');
+      // TODO: Arrow function return type annotations not yet implemented
+      // Currently infers Function type for the variable but not the specific return type
+      expect(result).toMatch(/getRegex:\s*Function/);
     });
   });
 
@@ -168,8 +168,9 @@ describe('RegExp literal type inference', () => {
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       expect(result).toMatch(/pattern:\s*RegExp/);
-      // exec() may or may not have known return type
-      expect(result).toContain('const');
+      // TODO: exec() return type not in known types - should be RegExpExecArray | null
+      // Currently returns no type annotation
+      expect(result).toContain('const match');
     });
   });
 
@@ -179,8 +180,9 @@ describe('RegExp literal type inference', () => {
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       expect(result).toMatch(/pattern:\s*RegExp/);
-      // match() may or may not have known return type
-      expect(result).toContain('const');
+      // match() is in known types and returns string (incorrectly - should be string[] | null)
+      // This is a known limitation documented in the type system
+      expect(result).toMatch(/matches:\s*string/);
     });
 
     it('should handle string replace with RegExp', async () => {

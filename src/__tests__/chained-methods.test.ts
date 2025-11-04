@@ -100,8 +100,9 @@ describe('Chained Method Calls', () => {
       const code = 'const data="1,2,3,4,5";const nums=data.split(",").map(s=>parseInt(s)).filter(n=>n>2);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Note: parseInt is not in known types, so map returns string[] (the array type)
-      // This is expected behavior - callback return type inference is item 27
+      // TODO: Callback return type inference not yet implemented (item 27 in TODO.md)
+      // parseInt is not in known types, so map() preserves the array element type (string)
+      // This is expected behavior until callback return type inference is implemented
       expect(result).toMatch(/nums:\s*string\[\]/);
     });
   });
@@ -183,8 +184,10 @@ describe('Chained Method Calls', () => {
       const code = 'const csv="name,age\\nJohn,30\\nJane,25";const rows=csv.split("\\n").slice(1).map(row=>row.split(","));';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Note: Nested split() in callback returns string[] but we infer the outer array type
-      // This is expected - callback return type inference is item 27
+      // TODO: Callback return type inference not yet implemented (item 27 in TODO.md)
+      // Nested split() in callback returns string[] but we currently preserve the array element type
+      // Expected: string[][] (array of arrays), Current: string[]
+      // This is expected behavior until callback return type inference is implemented
       expect(result).toMatch(/rows:\s*string\[\]/);
     });
 
