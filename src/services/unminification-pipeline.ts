@@ -229,6 +229,49 @@ export class UnminificationPipeline implements IUnminificationPipeline {
             path.node.id.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
           }
         }
+        // For patterns, let the Identifier visitor handle individual identifiers
+      },
+
+      // Add type annotations to identifiers (including those in destructuring patterns)
+      Identifier: (path: any) => {
+        // Skip if already has type annotation
+        if (path.node.typeAnnotation) {
+          return;
+        }
+
+        // Only annotate if this identifier is being declared in a pattern
+        const parent = path.parent;
+        let isInPattern = false;
+
+        // Check if this identifier is the value in an ObjectProperty within an ObjectPattern
+        if (t.isObjectProperty(parent) && parent.value === path.node) {
+          const grandParent = path.parentPath?.parentPath?.node;
+          if (t.isObjectPattern(grandParent)) {
+            isInPattern = true;
+          }
+        }
+
+        // Check if this identifier is directly in an ArrayPattern
+        if (t.isArrayPattern(parent)) {
+          isInPattern = true;
+        }
+
+        // Check if this identifier is in an AssignmentPattern (default value)
+        if (t.isAssignmentPattern(parent) && parent.left === path.node) {
+          const grandParent = path.parentPath?.parent;
+          if (t.isObjectPattern(grandParent) || t.isArrayPattern(grandParent)) {
+            isInPattern = true;
+          }
+        }
+
+        if (isInPattern) {
+          const varName = path.node.name;
+          const varType = typeMap.get(varName);
+
+          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any') {
+            path.node.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+          }
+        }
       },
 
       // Add type annotations to class properties and methods
@@ -379,6 +422,73 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         });
       }
     });
+  }
+
+  /**
+   * Add type annotations to destructuring patterns recursively
+   */
+  private addTypeAnnotationsToPattern(pattern: t.ObjectPattern | t.ArrayPattern, typeMap: TypeMap): void {
+    if (t.isObjectPattern(pattern)) {
+      pattern.properties.forEach(prop => {
+        if (t.isObjectProperty(prop)) {
+          if (t.isIdentifier(prop.value)) {
+            // Simple: const { x } = obj
+            const varName = prop.value.name;
+            const varType = typeMap.get(varName);
+            if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any' && !prop.value.typeAnnotation) {
+              prop.value.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+            }
+          } else if (t.isAssignmentPattern(prop.value) && t.isIdentifier(prop.value.left)) {
+            // With default: const { x = 5 } = obj
+            const varName = prop.value.left.name;
+            const varType = typeMap.get(varName);
+            if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any' && !prop.value.left.typeAnnotation) {
+              prop.value.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+            }
+          } else if (t.isObjectPattern(prop.value) || t.isArrayPattern(prop.value)) {
+            // Nested: const { user: { name } } = data
+            this.addTypeAnnotationsToPattern(prop.value, typeMap);
+          }
+        } else if (t.isRestElement(prop) && t.isIdentifier(prop.argument)) {
+          // Rest: const { x, ...rest } = obj
+          const varName = prop.argument.name;
+          const varType = typeMap.get(varName);
+          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any' && !prop.argument.typeAnnotation) {
+            prop.argument.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+          }
+        }
+      });
+    } else if (t.isArrayPattern(pattern)) {
+      pattern.elements.forEach(element => {
+        if (!element) return; // Hole in array
+
+        if (t.isIdentifier(element)) {
+          // Simple: const [x, y] = arr
+          const varName = element.name;
+          const varType = typeMap.get(varName);
+          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any' && !element.typeAnnotation) {
+            element.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+          }
+        } else if (t.isAssignmentPattern(element) && t.isIdentifier(element.left)) {
+          // With default: const [x = 5] = arr
+          const varName = element.left.name;
+          const varType = typeMap.get(varName);
+          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any' && !element.left.typeAnnotation) {
+            element.left.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+          }
+        } else if (t.isObjectPattern(element) || t.isArrayPattern(element)) {
+          // Nested: const [[a, b]] = matrix
+          this.addTypeAnnotationsToPattern(element, typeMap);
+        } else if (t.isRestElement(element) && t.isIdentifier(element.argument)) {
+          // Rest: const [first, ...rest] = arr
+          const varName = element.argument.name;
+          const varType = typeMap.get(varName);
+          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any' && !element.argument.typeAnnotation) {
+            element.argument.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+          }
+        }
+      });
+    }
   }
 
   /**

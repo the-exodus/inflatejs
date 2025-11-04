@@ -54,7 +54,175 @@ export class TypeCollector implements ITypeCollector {
           typeMap.set(varName, inferredType);
         }
       }
+    } else if (t.isObjectPattern(path.node.id) || t.isArrayPattern(path.node.id)) {
+      // Handle destructuring patterns
+      if (path.node.init) {
+        let initType = this.inferTypeFromNode(path.node.init);
+
+        // If init is an identifier, try to look up its type in typeMap
+        if (t.isIdentifier(path.node.init)) {
+          const sourceType = typeMap.get(path.node.init.name);
+          if (sourceType && sourceType.confidence > 0.5) {
+            initType = sourceType;
+          }
+        }
+
+        this.handleDestructuringPattern(path.node.id, initType, typeMap);
+      } else {
+        // Destructuring without init (shouldn't happen in practice)
+        this.handleDestructuringPattern(path.node.id, null, typeMap);
+      }
     }
+  }
+
+  /**
+   * Handle destructuring patterns (object and array)
+   */
+  private handleDestructuringPattern(
+    pattern: t.ObjectPattern | t.ArrayPattern,
+    sourceType: InferredType | null,
+    typeMap: TypeMap
+  ): void {
+    if (t.isObjectPattern(pattern)) {
+      this.handleObjectPattern(pattern, sourceType, typeMap);
+    } else if (t.isArrayPattern(pattern)) {
+      this.handleArrayPattern(pattern, sourceType, typeMap);
+    }
+  }
+
+  /**
+   * Handle object destructuring patterns
+   */
+  private handleObjectPattern(
+    pattern: t.ObjectPattern,
+    sourceType: InferredType | null,
+    typeMap: TypeMap
+  ): void {
+    // Try to get the source object type
+    let sourceObjectType: { [key: string]: InferredType } | null = null;
+
+    // If source is an identifier, try to look up its type
+    if (sourceType && sourceType.typeName === 'object' && sourceType.properties) {
+      sourceObjectType = sourceType.properties;
+    }
+
+    // Process each property in the pattern
+    pattern.properties.forEach(prop => {
+      if (t.isObjectProperty(prop)) {
+        // Get the property name from the key
+        let propertyName: string | null = null;
+        if (t.isIdentifier(prop.key)) {
+          propertyName = prop.key.name;
+        } else if (t.isStringLiteral(prop.key)) {
+          propertyName = prop.key.value;
+        }
+
+        // Handle the value (which could be identifier, pattern, or assignment)
+        if (t.isIdentifier(prop.value)) {
+          // Simple destructuring: const { x } = obj or const { x: y } = obj
+          const varName = prop.value.name;
+
+          // Try to get type from source object
+          if (sourceObjectType && propertyName && sourceObjectType[propertyName]) {
+            typeMap.set(varName, sourceObjectType[propertyName]);
+          } else {
+            // Fallback to any
+            typeMap.set(varName, { typeName: 'any', confidence: 0.5 });
+          }
+        } else if (t.isAssignmentPattern(prop.value)) {
+          // Destructuring with default: const { x = 5 } = obj
+          if (t.isIdentifier(prop.value.left)) {
+            const varName = prop.value.left.name;
+
+            // Try to infer type from default value
+            const defaultType = this.inferTypeFromNode(prop.value.right);
+            if (defaultType) {
+              typeMap.set(varName, defaultType);
+            } else if (sourceObjectType && propertyName && sourceObjectType[propertyName]) {
+              typeMap.set(varName, sourceObjectType[propertyName]);
+            } else {
+              typeMap.set(varName, { typeName: 'any', confidence: 0.5 });
+            }
+          }
+        } else if (t.isObjectPattern(prop.value) || t.isArrayPattern(prop.value)) {
+          // Nested destructuring: const { user: { name } } = data
+          let nestedType: InferredType | null = null;
+          if (sourceObjectType && propertyName && sourceObjectType[propertyName]) {
+            nestedType = sourceObjectType[propertyName];
+          }
+          this.handleDestructuringPattern(prop.value, nestedType, typeMap);
+        }
+      } else if (t.isRestElement(prop)) {
+        // Rest properties: const { x, ...rest } = obj
+        if (t.isIdentifier(prop.argument)) {
+          const varName = prop.argument.name;
+          typeMap.set(varName, { typeName: 'object', confidence: 0.8 });
+        }
+      }
+    });
+  }
+
+  /**
+   * Handle array destructuring patterns
+   */
+  private handleArrayPattern(
+    pattern: t.ArrayPattern,
+    sourceType: InferredType | null,
+    typeMap: TypeMap
+  ): void {
+    // Try to get the element type from source array
+    let elementType: InferredType | null = null;
+    if (sourceType && sourceType.typeName.endsWith('[]')) {
+      const baseType = sourceType.typeName.slice(0, -2);
+      elementType = { typeName: baseType, confidence: sourceType.confidence };
+    }
+
+    // Process each element in the pattern
+    pattern.elements.forEach(element => {
+      if (!element) {
+        // Hole in array destructuring: const [x, , z] = arr
+        return;
+      }
+
+      if (t.isIdentifier(element)) {
+        // Simple destructuring: const [x, y] = arr
+        const varName = element.name;
+        if (elementType) {
+          typeMap.set(varName, elementType);
+        } else {
+          typeMap.set(varName, { typeName: 'any', confidence: 0.5 });
+        }
+      } else if (t.isAssignmentPattern(element)) {
+        // Destructuring with default: const [x = 5] = arr
+        if (t.isIdentifier(element.left)) {
+          const varName = element.left.name;
+
+          // Try to infer type from default value
+          const defaultType = this.inferTypeFromNode(element.right);
+          if (defaultType) {
+            typeMap.set(varName, defaultType);
+          } else if (elementType) {
+            typeMap.set(varName, elementType);
+          } else {
+            typeMap.set(varName, { typeName: 'any', confidence: 0.5 });
+          }
+        }
+      } else if (t.isObjectPattern(element) || t.isArrayPattern(element)) {
+        // Nested destructuring: const [[a, b]] = matrix
+        this.handleDestructuringPattern(element, elementType, typeMap);
+      } else if (t.isRestElement(element)) {
+        // Rest elements: const [first, ...rest] = arr
+        if (t.isIdentifier(element.argument)) {
+          const varName = element.argument.name;
+          if (sourceType && sourceType.typeName.endsWith('[]')) {
+            // Rest should be same array type
+            typeMap.set(varName, { typeName: sourceType.typeName, confidence: sourceType.confidence });
+          } else {
+            typeMap.set(varName, { typeName: 'any[]', confidence: 0.5 });
+          }
+        }
+      }
+    });
   }
 
   /**
@@ -66,24 +234,7 @@ export class TypeCollector implements ITypeCollector {
       typeMap.set(funcName, { typeName: '(...args: any[]) => any', confidence: 0.7 });
 
       // Add parameters
-      path.node.params.forEach(param => {
-        if (t.isIdentifier(param)) {
-          typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-        } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
-          // Handle default parameters
-          const paramName = param.left.name;
-          const inferredType = this.inferTypeFromNode(param.right);
-          if (inferredType) {
-            typeMap.set(paramName, inferredType);
-          } else {
-            typeMap.set(paramName, { typeName: 'any', confidence: 0 });
-          }
-        } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
-          // Handle rest parameters
-          const paramName = param.argument.name;
-          typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
-        }
-      });
+      this.handleFunctionParameters(path.node.params, typeMap);
     }
   }
 
@@ -91,24 +242,7 @@ export class TypeCollector implements ITypeCollector {
    * Handle function expressions
    */
   private handleFunctionExpression(path: NodePath<t.FunctionExpression>, typeMap: TypeMap): void {
-    path.node.params.forEach(param => {
-      if (t.isIdentifier(param)) {
-        typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-      } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
-        // Handle default parameters
-        const paramName = param.left.name;
-        const inferredType = this.inferTypeFromNode(param.right);
-        if (inferredType) {
-          typeMap.set(paramName, inferredType);
-        } else {
-          typeMap.set(paramName, { typeName: 'any', confidence: 0 });
-        }
-      } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
-        // Handle rest parameters
-        const paramName = param.argument.name;
-        typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
-      }
-    });
+    this.handleFunctionParameters(path.node.params, typeMap);
   }
 
   /**
@@ -118,22 +252,40 @@ export class TypeCollector implements ITypeCollector {
     path: NodePath<t.ArrowFunctionExpression>,
     typeMap: TypeMap
   ): void {
-    path.node.params.forEach(param => {
+    this.handleFunctionParameters(path.node.params, typeMap);
+  }
+
+  /**
+   * Handle function parameters (including destructuring)
+   */
+  private handleFunctionParameters(params: Array<t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty>, typeMap: TypeMap): void {
+    params.forEach(param => {
       if (t.isIdentifier(param)) {
         typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-      } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
+      } else if (t.isAssignmentPattern(param)) {
         // Handle default parameters
-        const paramName = param.left.name;
-        const inferredType = this.inferTypeFromNode(param.right);
-        if (inferredType) {
-          typeMap.set(paramName, inferredType);
-        } else {
-          typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+        if (t.isIdentifier(param.left)) {
+          const paramName = param.left.name;
+          const inferredType = this.inferTypeFromNode(param.right);
+          if (inferredType) {
+            typeMap.set(paramName, inferredType);
+          } else {
+            typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+          }
+        } else if (t.isObjectPattern(param.left) || t.isArrayPattern(param.left)) {
+          // Destructuring with default: function fn({ x = 5 } = {})
+          const defaultType = this.inferTypeFromNode(param.right);
+          this.handleDestructuringPattern(param.left, defaultType, typeMap);
         }
-      } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
+      } else if (t.isRestElement(param)) {
         // Handle rest parameters
-        const paramName = param.argument.name;
-        typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
+        if (t.isIdentifier(param.argument)) {
+          const paramName = param.argument.name;
+          typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
+        }
+      } else if (t.isObjectPattern(param) || t.isArrayPattern(param)) {
+        // Destructuring parameters: function fn({ x, y })
+        this.handleDestructuringPattern(param, null, typeMap);
       }
     });
   }
@@ -161,22 +313,7 @@ export class TypeCollector implements ITypeCollector {
     // Skip constructors (they're handled separately)
     if (path.node.kind === 'constructor') {
       // Add constructor parameters to typeMap
-      path.node.params.forEach(param => {
-        if (t.isIdentifier(param)) {
-          typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-        } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
-          const paramName = param.left.name;
-          const inferredType = this.inferTypeFromNode(param.right);
-          if (inferredType) {
-            typeMap.set(paramName, inferredType);
-          } else {
-            typeMap.set(paramName, { typeName: 'any', confidence: 0 });
-          }
-        } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
-          const paramName = param.argument.name;
-          typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
-        }
-      });
+      this.handleFunctionParameters(path.node.params, typeMap);
       return;
     }
 
@@ -194,35 +331,40 @@ export class TypeCollector implements ITypeCollector {
       }
     } else if (path.node.kind === 'set') {
       // Setter - just add parameter type
-      path.node.params.forEach(param => {
-        if (t.isIdentifier(param)) {
-          typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-        }
-      });
+      this.handleFunctionParameters(path.node.params, typeMap);
     } else {
       // Regular or static method - infer full function signature
       returnType = this.inferReturnTypeFromFunction(path.node);
 
-      // Build parameter types
+      // Build parameter types and add to typeMap
       const paramTypes: string[] = [];
       path.node.params.forEach(param => {
         if (t.isIdentifier(param)) {
           paramTypes.push('any');
           typeMap.set(param.name, { typeName: 'any', confidence: 0 });
-        } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
-          const paramName = param.left.name;
-          const inferredType = this.inferTypeFromNode(param.right);
-          if (inferredType) {
-            paramTypes.push(inferredType.typeName);
-            typeMap.set(paramName, inferredType);
-          } else {
-            paramTypes.push('any');
-            typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+        } else if (t.isAssignmentPattern(param)) {
+          if (t.isIdentifier(param.left)) {
+            const paramName = param.left.name;
+            const inferredType = this.inferTypeFromNode(param.right);
+            if (inferredType) {
+              paramTypes.push(inferredType.typeName);
+              typeMap.set(paramName, inferredType);
+            } else {
+              paramTypes.push('any');
+              typeMap.set(paramName, { typeName: 'any', confidence: 0 });
+            }
+          } else if (t.isObjectPattern(param.left) || t.isArrayPattern(param.left)) {
+            const defaultType = this.inferTypeFromNode(param.right);
+            this.handleDestructuringPattern(param.left, defaultType, typeMap);
+            paramTypes.push('any'); // For signature
           }
         } else if (t.isRestElement(param) && t.isIdentifier(param.argument)) {
           const paramName = param.argument.name;
           paramTypes.push('...any[]');
           typeMap.set(paramName, { typeName: 'any[]', confidence: 0.8 });
+        } else if (t.isObjectPattern(param) || t.isArrayPattern(param)) {
+          this.handleDestructuringPattern(param, null, typeMap);
+          paramTypes.push('any'); // For signature
         } else {
           paramTypes.push('any');
         }
@@ -301,7 +443,7 @@ export class TypeCollector implements ITypeCollector {
       case 'ArrayExpression':
         return this.inferArrayType(node);
       case 'ObjectExpression':
-        return { typeName: 'object', confidence: 0.8 };
+        return this.inferObjectType(node);
       case 'FunctionExpression':
       case 'ArrowFunctionExpression':
         return this.inferFunctionExpressionType(node as t.FunctionExpression | t.ArrowFunctionExpression);
@@ -379,6 +521,50 @@ export class TypeCollector implements ITypeCollector {
     }
 
     return { typeName: 'any[]', confidence: 0.8 };
+  }
+
+  /**
+   * Infer object type from object expression, tracking property types
+   */
+  private inferObjectType(node: t.ObjectExpression): InferredType {
+    if (node.properties.length === 0) {
+      return { typeName: 'object', confidence: 0.8 };
+    }
+
+    // Track property types for destructuring
+    const properties: { [key: string]: InferredType } = {};
+    let hasProperties = false;
+
+    for (const prop of node.properties) {
+      if (t.isObjectProperty(prop) && !prop.computed) {
+        // Get property name
+        let propertyName: string | null = null;
+        if (t.isIdentifier(prop.key)) {
+          propertyName = prop.key.name;
+        } else if (t.isStringLiteral(prop.key)) {
+          propertyName = prop.key.value;
+        }
+
+        // Infer property value type
+        if (propertyName && t.isExpression(prop.value)) {
+          const valueType = this.inferTypeFromNode(prop.value);
+          if (valueType && valueType.confidence >= 0.7) {
+            properties[propertyName] = valueType;
+            hasProperties = true;
+          }
+        }
+      }
+    }
+
+    if (hasProperties) {
+      return {
+        typeName: 'object',
+        confidence: 0.9,
+        properties
+      };
+    }
+
+    return { typeName: 'object', confidence: 0.8 };
   }
 
   /**

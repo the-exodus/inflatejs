@@ -527,5 +527,94 @@ describe('Confidence Score Validation', () => {
       const serviceType = typeMap.get('Service');
       expect(serviceType).toBeDefined();
     });
+
+    it('should assign high confidence to object destructuring from literals', () => {
+      const code = 'const user = { name: "John", age: 30 }; const { name, age } = user;';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      // Destructured variables should have high confidence from literal
+      const nameType = typeMap.get('name');
+      const ageType = typeMap.get('age');
+
+      expect(nameType).toBeDefined();
+      expect(nameType!.typeName).toBe('string');
+      expect(nameType!.confidence).toBeGreaterThanOrEqual(0.7);
+
+      expect(ageType).toBeDefined();
+      expect(ageType!.typeName).toBe('number');
+      expect(ageType!.confidence).toBeGreaterThanOrEqual(0.7);
+    });
+
+    it('should assign high confidence to array destructuring from literals', () => {
+      const code = 'const coords = [10, 20]; const [x, y] = coords;';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      // Destructured variables should inherit array element type
+      const xType = typeMap.get('x');
+      const yType = typeMap.get('y');
+
+      expect(xType).toBeDefined();
+      expect(xType!.typeName).toBe('number');
+      expect(xType!.confidence).toBeGreaterThanOrEqual(0.7);
+
+      expect(yType).toBeDefined();
+      expect(yType!.typeName).toBe('number');
+      expect(yType!.confidence).toBeGreaterThanOrEqual(0.7);
+    });
+
+    it('should assign reasonable confidence to nested destructuring', () => {
+      const code = 'const data = { user: { name: "John" } }; const { user: { name } } = data;';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      // Nested destructuring should preserve type
+      const nameType = typeMap.get('name');
+      expect(nameType).toBeDefined();
+      expect(nameType!.typeName).toBe('string');
+      expect(nameType!.confidence).toBeGreaterThanOrEqual(0.7);
+    });
+
+    it('should assign high confidence to destructuring with default values', () => {
+      const code = 'const obj = { x: 1 }; const { x, y = 2 } = obj;';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      // Default value should provide type
+      const xType = typeMap.get('x');
+      const yType = typeMap.get('y');
+
+      expect(xType).toBeDefined();
+      expect(xType!.typeName).toBe('number');
+      expect(xType!.confidence).toBeGreaterThanOrEqual(0.7);
+
+      expect(yType).toBeDefined();
+      expect(yType!.typeName).toBe('number');
+      expect(yType!.confidence).toBeGreaterThanOrEqual(0.7); // From default value
+    });
+
+    it('should handle destructuring with rest elements', () => {
+      const code = 'const arr = [1, 2, 3]; const [first, ...rest] = arr;';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      // First element should be number
+      const firstType = typeMap.get('first');
+      expect(firstType).toBeDefined();
+      expect(firstType!.typeName).toBe('number');
+      expect(firstType!.confidence).toBeGreaterThanOrEqual(0.7);
+
+      // Rest should be number[]
+      const restType = typeMap.get('rest');
+      expect(restType).toBeDefined();
+      expect(restType!.typeName).toBe('number[]');
+      expect(restType!.confidence).toBeGreaterThanOrEqual(0.7);
+    });
   });
 });

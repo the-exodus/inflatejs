@@ -371,5 +371,53 @@ describe('TypeScript Compilation Tests', () => {
       const diagnostics = compileTypeScript(result);
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
+
+    it('should compile object destructuring', async () => {
+      const code = 'const user={name:"John",age:30};const {name,age}=user;';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile array destructuring', async () => {
+      const code = 'const coords=[10,20];const [x,y]=coords;const sum=x+y;';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile nested destructuring', async () => {
+      const code = 'const data={user:{name:"John",coords:[10,20]}};const {user:{name,coords:[x,y]}}=data;';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile parameter destructuring', async () => {
+      const code = 'function greet({name,age}){return `${name} is ${age}`;}function sum([a,b]){return a+b;}';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile destructuring with default values', async () => {
+      const code = 'const obj={x:1};const {x,y=2}=obj;const arr=[1];const [a,b=2]=arr;';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile destructuring with rest elements', async () => {
+      const code = 'const obj={a:1,b:2,c:3};const {a,...rest}=obj;const arr=[1,2,3];const [first,...others]=arr;';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
   });
 });

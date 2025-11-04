@@ -7,6 +7,8 @@ export interface InferredType {
   typeName: string;
   // Confidence level (0-1) of the inference
   confidence: number;
+  // Object property types (for destructuring support)
+  properties?: { [key: string]: InferredType };
 }
 
 // Map to store inferred types for each variable/parameter
