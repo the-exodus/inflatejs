@@ -308,7 +308,8 @@ export class UnminificationPipeline implements IUnminificationPipeline {
           // Lower threshold for variables (0.5) to allow chained method calls
           // Each method in a chain applies a 0.9 confidence penalty, so after 3 methods
           // we're at 0.729, and after array transformation callbacks we can be around 0.6-0.65
-          if (varType && varType.confidence >= 0.5 && varType.typeName !== 'any') {
+          // Skip 'void' type as it's usually inaccurate for variables (indicates missing return type inference)
+          if (varType && varType.confidence >= 0.5 && varType.typeName !== 'any' && varType.typeName !== 'void') {
             path.node.id.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
           }
         }
