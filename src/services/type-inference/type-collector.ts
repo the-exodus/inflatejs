@@ -101,8 +101,8 @@ export class TypeCollector implements ITypeCollector {
     // Try to get the source object type
     let sourceObjectType: { [key: string]: InferredType } | null = null;
 
-    // If source is an identifier, try to look up its type
-    if (sourceType && sourceType.typeName === 'object' && sourceType.properties) {
+    // If source has properties (object literal shape or generic object), use them
+    if (sourceType && sourceType.properties) {
       sourceObjectType = sourceType.properties;
     }
 
