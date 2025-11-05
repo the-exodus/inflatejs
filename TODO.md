@@ -16,6 +16,7 @@ All tests have been verified to follow the 5-point testing strategy (CLAUDE.md):
 - Updated 4 outdated TODO comments to reflect completed features
 - Verified all 750 passing tests check actual type inference, not just syntax
 - All 3 skipped tests are properly documented with clear explanations
+- Clarified destructuring with default values: **feature fully works**, compilation test skipped due to TypeScript type system limitation
 - All test suites verified to follow CLAUDE.md test quality requirements
 
 ## Priority 1: Critical (High Impact, Quick Wins)
@@ -229,7 +230,7 @@ const repeated = "x".repeat(3);
 - Object destructuring validates against source object shape types
 - Array destructuring preserves array element types in pattern
 - Nested patterns work recursively
-- Default values preserved in output (though type propagation not yet implemented)
+- Default values preserved in output ✅
 - Rest elements handled correctly
 
 **Known Limitations**:
@@ -244,8 +245,8 @@ const repeated = "x".repeat(3);
   - 31 feature tests (all patterns, edge cases, realistic scenarios)
   - 9 TypeScript compilation tests
   - 5 confidence score tests
-**Tests Skipped**: 1/46 (blocked on AST transformation limitation)
-  - 1 TypeScript compilation test (destructuring with default values - default values lost during transformation)
+**Tests Skipped**: 1/46 (TypeScript type system design limitation)
+  - 1 TypeScript compilation test (destructuring with default values - feature works but TS complains about accessing non-existent property)
 
 Object and array destructuring in variable declarations and function parameters.
 
@@ -1323,7 +1324,7 @@ For each TODO item:
   - 2 tests skipped: reduce return type inference (requires context-aware method return types)
   - Fixed object property access in callbacks, empty array fallback, untyped parameter handling
 - **Total test count: 753 (750 passing, 3 skipped)**
-  - 1 skipped: destructuring with default values (blocked on AST transformation limitation)
+  - 1 skipped: destructuring with default values **TypeScript compilation only** (feature works, TS type system limitation)
   - 2 skipped: reduce return type inference (requires context-aware method return types)
 - **Phase 4: 5 of 6 items complete** (Class features ✅, Destructuring ✅, Object Literal Shape Types ✅, Destructured Variable Type Propagation ✅, Callback Type Inference ✅)
 
