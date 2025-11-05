@@ -256,11 +256,7 @@ describe('Callback Type Inference', () => {
   });
 
   describe('Array.prototype.reduce - Advanced', () => {
-    it.skip('should infer callback parameters for reduce with number accumulator', async () => {
-      // TODO: Reduce return type inference not yet implemented
-      // Currently reduce is hardcoded to return 'any' in known-types.ts
-      // To fix: Make known-types context-aware to infer reduce return type from initial value
-      // Blocked on: Context-aware method return type inference (enhancement)
+    it('should infer callback parameters for reduce with number accumulator', async () => {
       const code = 'const numbers=[1,2,3];const sum=numbers.reduce((acc,n)=>acc+n,0);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
@@ -278,11 +274,7 @@ describe('Callback Type Inference', () => {
       expect(result).toMatch(/sum:\s*number/);
     });
 
-    it.skip('should infer callback parameters for reduce with string accumulator', async () => {
-      // TODO: Reduce return type inference not yet implemented
-      // Currently reduce is hardcoded to return 'any' in known-types.ts
-      // To fix: Make known-types context-aware to infer reduce return type from initial value
-      // Blocked on: Context-aware method return type inference (enhancement)
+    it('should infer callback parameters for reduce with string accumulator', async () => {
       const code = 'const words=["a","b","c"];const joined=words.reduce((acc,w)=>acc+w,"");';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 

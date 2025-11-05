@@ -247,8 +247,8 @@ describe('Spread Operator', () => {
       // arr should be inferred as number[], spread params in function call work
       expect(result).toMatch(/arr:\s*number\[\]/);
       expect(result).toMatch(/\.reduce\(/);
-      // total type inference from function return is limited, but code should be syntactically correct
-      expect(result).toMatch(/total\s*=/);
+      // total should be inferred as number (from reduce return type inference)
+      expect(result).toMatch(/total:\s*number/);
     });
 
     it('should handle array prepend/append', async () => {

@@ -6,14 +6,14 @@ This document lists JavaScript/TypeScript constructs that are not yet handled by
 
 ## Current Status
 
-**Tests**: 751 passing, 2 skipped (out of 753 total)
+**Tests**: 753 passing, 0 skipped (ALL TESTS PASSING! 🎉)
 **Coverage**: ~67% statements, ~58% branches, ~77% functions
 
 **Completed Phases**:
 - ✅ Phase 1: Foundation (4/4 items, 75 tests)
 - ✅ Phase 2: Common Patterns (6/6 items, 144 tests)
 - ✅ Phase 3: Modern JavaScript (4/4 items, 124 tests)
-- ✅ Phase 4: Advanced Features (5.5/6 items, 171 tests)
+- ✅ Phase 4: Advanced Features (6/6 items, 173 tests) - **COMPLETE!**
 
 **See [DONE.md](./DONE.md) for full details on completed features.**
 
@@ -34,58 +34,9 @@ All tests MUST follow the 5-point testing strategy (see CLAUDE.md):
 
 ## Remaining Features
 
-### Priority 1: High Impact Features
+### Priority 1: Important Features
 
-#### 1. Reduce Return Type Inference ⏭️ BLOCKED (2 tests skipped)
-**Impact**: Medium (improves callback inference completeness)
-**Effort**: Medium (1-2 hours)
-**Blocks**: Full callback type inference completion
-
-Currently `reduce` is hardcoded to return `any` in known-types.ts. Need to infer return type from initial value argument.
-
-**Examples that need implementation:**
-```javascript
-const numbers = [1, 2, 3];
-
-// Reduce with numeric initial value
-const sum = numbers.reduce((acc, n) => acc + n, 0);
-// Current: sum: any
-// Expected: sum: number (from initial value)
-
-// Reduce with object initial value
-const obj = numbers.reduce((acc, n) => ({...acc, [n]: n * 2}), {});
-// Current: obj: any
-// Expected: obj: object (from initial value)
-
-// Reduce with string initial value
-const str = ["a", "b", "c"].reduce((acc, s) => acc + s, "");
-// Current: str: any
-// Expected: str: string (from initial value)
-
-// Reduce with array initial value
-const flat = [[1, 2], [3, 4]].reduce((acc, arr) => acc.concat(arr), []);
-// Current: flat: any
-// Expected: flat: any[] or number[] (from initial value)
-
-// Reduce without initial value (return type from array element type)
-const product = [1, 2, 3].reduce((acc, n) => acc * n);
-// Current: product: any
-// Expected: product: number (from array element type)
-```
-
-**Implementation approach**:
-1. Make known-types context-aware to accept CallExpression node
-2. For `reduce`, inspect second argument (initial value) to infer return type
-3. If no initial value, return array element type
-4. Handle edge cases (empty arrays, no initial value = error)
-
-**Related tests**: 2 skipped tests in `src/__tests__/callback-inference.test.ts`
-
----
-
-### Priority 2: Important Features
-
-#### 2. JSON Methods
+#### 1. JSON Methods
 **Impact**: Medium
 **Effort**: Low (5 minutes - add to known-types)
 
@@ -102,7 +53,7 @@ const stringified = JSON.stringify({ x: 1 });
 
 ---
 
-#### 3. Promise Static Methods
+#### 2. Promise Static Methods
 **Impact**: Medium
 **Effort**: Medium (30 minutes)
 
@@ -127,7 +78,7 @@ const race = Promise.race([p1, p2]);
 
 ### Priority 3: Advanced Features
 
-#### 4. Nullish Coalescing Enhancement
+#### 3. Nullish Coalescing Enhancement
 **Impact**: Low-Medium (ES2020 feature)
 **Effort**: Low-Medium (20-30 minutes for union type filtering)
 
@@ -254,7 +205,7 @@ const withNullishNum = 0 ?? 42;        // Returns 0 (0 is not nullish)
 
 ---
 
-#### 5. Generator Functions
+#### 4. Generator Functions
 **Impact**: Low (specialized use)
 **Effort**: High (2 hours)
 
@@ -274,7 +225,7 @@ const first = gen.next();
 
 ---
 
-#### 6. Async Iterators
+#### 5. Async Iterators
 **Impact**: Low (advanced feature)
 **Effort**: High (2 hours)
 
@@ -289,7 +240,7 @@ async function* asyncGenerator() {
 
 ---
 
-#### 7. Symbol and BigInt
+#### 6. Symbol and BigInt
 **Impact**: Low (rarely used in minified code)
 **Effort**: Low (5 minutes)
 
@@ -307,7 +258,7 @@ const computed = BigInt(100);
 
 ---
 
-#### 8. Computed Property Names
+#### 7. Computed Property Names
 **Impact**: Low
 **Effort**: Medium (1 hour)
 
@@ -323,7 +274,7 @@ const obj = {
 
 ---
 
-#### 9. Type Narrowing
+#### 8. Type Narrowing
 **Impact**: Medium (important for accuracy)
 **Effort**: Very High (4+ hours - requires control flow analysis)
 
@@ -343,7 +294,7 @@ function process(value) {
 
 ---
 
-#### 10. IndexedAccess / Computed Member Access
+#### 9. IndexedAccess / Computed Member Access
 **Impact**: Medium
 **Effort**: Medium (1 hour)
 
@@ -361,7 +312,7 @@ const value = obj[key];
 
 ---
 
-#### 11. this Context
+#### 10. this Context
 **Impact**: Medium
 **Effort**: High (2-3 hours)
 
@@ -378,7 +329,7 @@ const obj = {
 
 ---
 
-#### 12. Closures with Captured Variables
+#### 11. Closures with Captured Variables
 **Impact**: Medium
 **Effort**: Medium (current system might handle, may need verification)
 
@@ -398,13 +349,13 @@ const value = counter();
 
 ---
 
-#### 13. Class Property Tracking
+#### 12. Class Property Tracking
 **Impact**: Medium-High (significantly improves class feature inference)
 **Effort**: Very High (3-4 hours - requires architectural changes)
 
 **Why needed**: Currently, getters and methods that return `this.property` cannot infer accurate types because property types are not tracked across the class scope. This limits the usefulness of class feature inference.
 
-**Dependencies**: Will be significantly helped by type narrowing (item #9) implementation, which provides control flow analysis that can track property assignments.
+**Dependencies**: Will be significantly helped by type narrowing (item #8) implementation, which provides control flow analysis that can track property assignments.
 
 **What's needed**:
 1. Class-level property type map to track property assignments
@@ -513,8 +464,8 @@ class Optional {
 
 **Related items**:
 - See DONE.md item #19 (Class Features) - Currently limited by lack of property tracking
-- Item #9 (Type Narrowing) - Will provide control flow analysis for property tracking
-- Item #11 (this Context) - Related to understanding `this.property` access
+- Item #8 (Type Narrowing) - Will provide control flow analysis for property tracking
+- Item #10 (this Context) - Related to understanding `this.property` access
 
 ---
 
@@ -522,68 +473,68 @@ class Optional {
 
 ### Next Recommended Items (Ordered by ROI)
 
-1. **Reduce Return Type Inference** (item #1) - Completes callback inference, unblocks 2 tests
-   - Medium effort, medium impact
-   - Direct improvement to existing feature
-   - Clear implementation path
-
-2. **JSON Methods** (item #2) - Quick win, commonly used
+1. **JSON Methods** (item #1) - Quick win, commonly used
    - Low effort (5 minutes)
    - Medium impact
    - Just add to known-types
 
-3. **Symbol and BigInt** (item #7) - Quick win for completeness
+2. **Symbol and BigInt** (item #6) - Quick win for completeness
    - Low effort (5 minutes)
    - Low impact but easy to add
    - Just add to known-types
 
-4. **Computed Property Names** (item #8) - Modern JavaScript support
+3. **Computed Property Names** (item #7) - Modern JavaScript support
    - Medium effort (1 hour)
    - Low-medium impact
    - Improves object literal inference
 
-5. **IndexedAccess / Computed Member Access** (item #10) - Common pattern
+4. **IndexedAccess / Computed Member Access** (item #9) - Common pattern
    - Medium effort (1 hour)
    - Medium impact
    - Useful for array/object access
 
+5. **Nullish Coalescing Enhancement** (item #3) - Improves union type accuracy
+   - Low-medium effort (20-30 minutes)
+   - Low-medium impact
+   - Simple union type filtering
+
 ### Advanced Items (Longer Term)
 
-6. **Promise Static Methods** (item #3) - Async support
+6. **Promise Static Methods** (item #2) - Async support
    - Medium effort (30 minutes)
    - Medium impact
    - Requires Promise type support
 
-7. **Closures with Captured Variables** (item #12) - Improve closure inference
+7. **Closures with Captured Variables** (item #11) - Improve closure inference
    - Medium effort (may already work)
    - Medium impact
    - May just need verification tests
 
-8. **Type Narrowing** (item #9) - High value but complex
+8. **Type Narrowing** (item #8) - High value but complex
    - Very high effort (4+ hours)
    - Medium impact (improves accuracy significantly)
    - Requires control flow analysis
    - Unlocks other features
 
-9. **Class Property Tracking** (item #13) - Improves class inference
+9. **Class Property Tracking** (item #12) - Improves class inference
    - Very high effort (3-4 hours)
    - Medium-high impact
    - Depends on type narrowing
    - Significantly improves class features
 
-10. **this Context** (item #11) - Related to class property tracking
+10. **this Context** (item #10) - Related to class property tracking
     - High effort (2-3 hours)
     - Medium impact
     - Works with class property tracking
 
 ### Specialized Features (Lower Priority)
 
-11. **Generator Functions** (item #5) - Specialized use case
+11. **Generator Functions** (item #4) - Specialized use case
     - High effort (2 hours)
     - Low impact
     - Rarely used in minified code
 
-12. **Async Iterators** (item #6) - Advanced feature
+12. **Async Iterators** (item #5) - Advanced feature
     - High effort (2 hours)
     - Low impact
     - Very specialized
@@ -607,18 +558,16 @@ See CLAUDE.md for detailed test quality requirements and examples.
 ## Summary Statistics
 
 ### Remaining by Priority
-- **Priority 1 (High Impact)**: 1 item
-- **Priority 2 (Important)**: 2 items
+- **Priority 1 (Important)**: 2 items
 - **Priority 3 (Advanced)**: 10 items
 
 ### Remaining by Effort
-- **Low (< 30 min)**: 3 items (JSON, Symbol/BigInt, Nullish coalescing check)
-- **Medium (30 min - 2 hours)**: 5 items (Reduce, Promise, Computed properties, IndexedAccess, Closures)
+- **Low (< 30 min)**: 3 items (JSON, Symbol/BigInt, Nullish coalescing enhancement)
+- **Medium (30 min - 2 hours)**: 4 items (Promise, Computed properties, IndexedAccess, Closures)
 - **High (2+ hours)**: 5 items (Generators, Async iterators, Type narrowing, this Context, Class property tracking)
 
 ### Quick Wins Available
-Implementing items #1, #2, #7 would take ~1.5 hours and complete:
-- Reduce return type inference (completes callback inference)
+Implementing items #1 and #6 would take ~10 minutes and complete:
 - JSON methods (parse, stringify)
 - Symbol and BigInt literals
 

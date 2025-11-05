@@ -4,7 +4,7 @@ This document tracks all completed type inference features with their implementa
 
 ## Summary Statistics
 
-**Total Tests**: 751 passing, 2 skipped (out of 753 total)
+**Total Tests**: 753 passing, 0 skipped (ALL TESTS PASSING! 🎉)
 **Overall Coverage**: ~67% statements, ~58% branches, ~77% functions
 
 ### Completion by Phase
@@ -12,7 +12,7 @@ This document tracks all completed type inference features with their implementa
 - **Phase 1 (Foundation)**: ✅ COMPLETED (4/4 items, 75 tests)
 - **Phase 2 (Common Patterns)**: ✅ COMPLETED (6/6 items, 144 tests)
 - **Phase 3 (Modern JavaScript)**: ✅ COMPLETED (4/4 items, 124 tests)
-- **Phase 4 (Advanced Features)**: ✅ 5/6 COMPLETE (5.5/6 items, 171 tests)
+- **Phase 4 (Advanced Features)**: ✅ COMPLETED (6/6 items, 173 tests)
 
 ---
 
@@ -762,29 +762,34 @@ const result = "hello,world,test"
 
 ---
 
-### 21. Callback Type Inference ✅ NEARLY COMPLETE
+### 21. Callback Type Inference ✅ COMPLETED
 **Impact**: High (very useful)
 **Effort**: Very High (4+ hours)
-**Tests**: 25/27 tests passing (2 skipped for reduce return type)
+**Tests**: 27/27 tests passing (ALL COMPLETE!)
 
-Callback parameter and return type inference for array methods.
+Callback parameter and return type inference for array methods, including reduce return type inference.
 
 **What works:**
-- Callback parameter type inference from array element types
-- Callback return type inference for map/flatMap methods
-- Simple callbacks: `x => x * 2`
-- Complex expressions: `w => w.length`
-- Block statements with return
-- Chained methods
-- Scope-aware parameter renaming
-- Object property access in callbacks: `users.map(u => u.name)` correctly infers `string[]`
-- Empty array callbacks properly fallback to `any`
-- Untyped function parameters: `function(arr) { arr.map(x => ...) }` → `(param: any)`
+- ✅ Callback parameter type inference from array element types
+- ✅ Callback return type inference for map/flatMap methods
+- ✅ **Reduce return type inference from initial value** (NEW!)
+- ✅ Simple callbacks: `x => x * 2`
+- ✅ Complex expressions: `w => w.length`
+- ✅ Block statements with return
+- ✅ Chained methods
+- ✅ Scope-aware parameter renaming
+- ✅ Object property access in callbacks: `users.map(u => u.name)` correctly infers `string[]`
+- ✅ Empty array callbacks properly fallback to `any`
+- ✅ Untyped function parameters: `function(arr) { arr.map(x => ...) }` → `(param: any)`
 
 **Implementation notes**:
 - Enhanced TypeCollector to infer callback parameter types via `inferCallbackContext()` and `inferCallbackParameterType()`
 - Enhanced TypeResolver to infer callback return types via `inferCallbackReturnType()`
 - Modified `inferMethodReturnType()` to accept `callNode` and `typeMap` for context
+- **Added reduce return type inference in TypeResolver's `inferMethodReturnType()`** (NEW!)
+  - Infers return type from second argument (initial value) if provided
+  - Falls back to array element type if no initial value
+  - Confidence 0.9 for initial value types, 0.8 for element type fallback
 - Scope-aware typeMap updates in UnminificationPipeline for parameter renaming
 - Lowered variable annotation confidence threshold from 0.7 to 0.5
 - Each method in chain applies 0.9 confidence penalty
@@ -823,41 +828,23 @@ function process(arr) {
   return arr.map(x => x * 2);
 }
 // Result: (param: any) => ... ✅
+
+// Reduce with initial value (NEW!)
+const sum = numbers.reduce((acc, n) => acc + n, 0);
+// Result: (acc: number, param: number) => ... sum: number ✅
+
+const joined = ["a", "b", "c"].reduce((acc, s) => acc + s, "");
+// Result: (acc: string, param: string) => ... joined: string ✅
+
+// Reduce without initial value
+const product = numbers.reduce((acc, n) => acc * n);
+// Result: (acc: number, param: number) => ... product: number ✅
 ```
 
 **Test files**:
-- `src/__tests__/callback-inference.test.ts`
+- `src/__tests__/callback-type-inference.test.ts`
 - `src/__tests__/typescript-compilation.test.ts` (Phase 4 section)
 - `src/__tests__/confidence-scores.test.ts` (Phase 4 section)
-
----
-
-## Known Limitations
-
-### Reduce Return Type Inference (2 tests skipped)
-**Status**: Not implemented yet
-**Why skipped**: Requires context-aware method return type system
-
-Currently `reduce` is hardcoded to return `any` in known-types.ts. To implement:
-- Make known-types context-aware to infer reduce return type from initial value argument
-- Enhancement for future: Context-aware method return type system
-
-**Examples not yet working:**
-```javascript
-const numbers = [1, 2, 3];
-
-// Reduce with explicit initial value
-const sum = numbers.reduce((acc, n) => acc + n, 0);
-// Current: sum: any ❌
-// Expected: sum: number (from initial value) ⏭️
-
-// Reduce with object accumulator
-const obj = numbers.reduce((acc, n) => ({...acc, [n]: n * 2}), {});
-// Current: obj: any ❌
-// Expected: obj: object (from initial value) ⏭️
-```
-
-**Related tests**: 2 skipped tests in callback-inference.test.ts
 
 ---
 
@@ -898,14 +885,15 @@ For each completed feature, all 5 test types were created:
 - Spread operator
 - **Result**: 124 new tests, modern ES6+ features complete
 
-### Phase 4 (6-7+ hours): Advanced Features ✅ 5.5/6 COMPLETE
+### Phase 4 (6-7+ hours): Advanced Features ✅ COMPLETE
 - Object Literal Shape Types
 - Destructured Variable Type Propagation
 - Destructuring
 - Class features
 - Chained method calls
-- Callback type inference (25/27 tests, 2 skipped for reduce)
-- **Result**: 171 new tests, advanced features working well
+- Callback type inference (27/27 tests, ALL PASSING!)
+- Reduce return type inference (NEW!)
+- **Result**: 173 new tests, advanced features complete!
 
 ---
 
@@ -937,7 +925,7 @@ The following files were modified to implement these features:
 - `src/__tests__/destructuring.test.ts` (46 tests)
 - `src/__tests__/class-features.test.ts` (50 tests)
 - `src/__tests__/chained-methods.test.ts` (26 tests)
-- `src/__tests__/callback-inference.test.ts` (29 tests)
+- `src/__tests__/callback-type-inference.test.ts` (27 tests)
 
 ### Test Files Enhanced
 - `src/__tests__/typescript-compilation.test.ts` - Added tests for all phases

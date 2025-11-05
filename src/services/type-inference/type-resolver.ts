@@ -302,6 +302,26 @@ export class TypeResolver implements ITypeResolver {
       // Extract element type from array type (e.g., "number[]" -> "number")
       const elementType = objType.slice(0, -2);
 
+      // Special handling for reduce - infer return type from initial value
+      if (methodName === 'reduce' && callNode && callNode.arguments.length > 0) {
+        // Check if there's an initial value (second argument)
+        if (callNode.arguments.length >= 2) {
+          const initialValue = callNode.arguments[1];
+          const initialType = this.inferTypeFromNode(initialValue, typeMap || new Map(), 0);
+
+          if (initialType && initialType.confidence >= 0.7) {
+            return {
+              typeName: initialType.typeName,
+              confidence: initialType.confidence * 0.9
+            };
+          }
+        }
+
+        // No initial value - return type is the element type
+        // (reduce without initial value returns same type as array elements)
+        return { typeName: elementType, confidence: 0.8 };
+      }
+
       // Methods that transform element types based on callback
       if (['map', 'flatMap'].includes(methodName) && callNode && typeMap && callNode.arguments.length > 0) {
         const callback = callNode.arguments[0];
