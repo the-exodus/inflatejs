@@ -52,4 +52,10 @@ export const knownTypes: Map<string, string> = new Map([
   // Type conversion functions
   ['parseInt', 'number'],
   ['parseFloat', 'number'],
+  // JSON static methods
+  ['JSON.parse', 'any'],
+  ['JSON.stringify', 'string'],
+  // Symbol and BigInt constructors
+  ['Symbol', 'symbol'],
+  ['BigInt', 'bigint'],
 ]);

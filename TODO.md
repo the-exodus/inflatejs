@@ -6,11 +6,11 @@ This document lists JavaScript/TypeScript constructs that are not yet handled by
 
 ## Current Status
 
-**Tests**: 753 passing, 0 skipped (ALL TESTS PASSING! 🎉)
+**Tests**: 790 passing, 0 skipped (ALL TESTS PASSING! 🎉)
 **Coverage**: ~67% statements, ~58% branches, ~77% functions
 
 **Completed Phases**:
-- ✅ Phase 1: Foundation (4/4 items, 75 tests)
+- ✅ Phase 1: Foundation (6/6 items, 112 tests)
 - ✅ Phase 2: Common Patterns (6/6 items, 144 tests)
 - ✅ Phase 3: Modern JavaScript (4/4 items, 124 tests)
 - ✅ Phase 4: Advanced Features (6/6 items, 173 tests) - **COMPLETE!**
@@ -36,24 +36,7 @@ All tests MUST follow the 5-point testing strategy (see CLAUDE.md):
 
 ### Priority 1: Important Features
 
-#### 1. JSON Methods
-**Impact**: Medium
-**Effort**: Low (5 minutes - add to known-types)
-
-`JSON.parse()`, `JSON.stringify()`
-
-**Examples for tests:**
-```javascript
-const parsed = JSON.parse('{"x":1}');
-// Expected: parsed: any (or object)
-
-const stringified = JSON.stringify({ x: 1 });
-// Expected: stringified: string
-```
-
----
-
-#### 2. Promise Static Methods
+#### 1. Promise Static Methods
 **Impact**: Medium
 **Effort**: Medium (30 minutes)
 
@@ -78,7 +61,7 @@ const race = Promise.race([p1, p2]);
 
 ### Priority 3: Advanced Features
 
-#### 3. Nullish Coalescing Enhancement
+#### 2. Nullish Coalescing Enhancement
 **Impact**: Low-Medium (ES2020 feature)
 **Effort**: Low-Medium (20-30 minutes for union type filtering)
 
@@ -240,25 +223,7 @@ async function* asyncGenerator() {
 
 ---
 
-#### 6. Symbol and BigInt
-**Impact**: Low (rarely used in minified code)
-**Effort**: Low (5 minutes)
-
-**Examples for tests:**
-```javascript
-const sym = Symbol("key");
-// Expected: sym: symbol
-
-const big = 100n;
-// Expected: big: bigint
-
-const computed = BigInt(100);
-// Expected: computed: bigint
-```
-
----
-
-#### 7. Computed Property Names
+#### 3. Computed Property Names
 **Impact**: Low
 **Effort**: Medium (1 hour)
 
@@ -274,7 +239,7 @@ const obj = {
 
 ---
 
-#### 8. Type Narrowing
+#### 4. Type Narrowing
 **Impact**: Medium (important for accuracy)
 **Effort**: Very High (4+ hours - requires control flow analysis)
 
@@ -294,7 +259,7 @@ function process(value) {
 
 ---
 
-#### 9. IndexedAccess / Computed Member Access
+#### 5. IndexedAccess / Computed Member Access
 **Impact**: Medium
 **Effort**: Medium (1 hour)
 
@@ -312,7 +277,7 @@ const value = obj[key];
 
 ---
 
-#### 10. this Context
+#### 6. this Context
 **Impact**: Medium
 **Effort**: High (2-3 hours)
 
@@ -329,7 +294,7 @@ const obj = {
 
 ---
 
-#### 11. Closures with Captured Variables
+#### 7. Closures with Captured Variables
 **Impact**: Medium
 **Effort**: Medium (current system might handle, may need verification)
 
@@ -349,7 +314,7 @@ const value = counter();
 
 ---
 
-#### 12. Class Property Tracking
+#### 8. Class Property Tracking
 **Impact**: Medium-High (significantly improves class feature inference)
 **Effort**: Very High (3-4 hours - requires architectural changes)
 
@@ -473,68 +438,58 @@ class Optional {
 
 ### Next Recommended Items (Ordered by ROI)
 
-1. **JSON Methods** (item #1) - Quick win, commonly used
-   - Low effort (5 minutes)
-   - Medium impact
-   - Just add to known-types
-
-2. **Symbol and BigInt** (item #6) - Quick win for completeness
-   - Low effort (5 minutes)
-   - Low impact but easy to add
-   - Just add to known-types
-
-3. **Computed Property Names** (item #7) - Modern JavaScript support
+1. **Computed Property Names** (item #3) - Modern JavaScript support
    - Medium effort (1 hour)
    - Low-medium impact
    - Improves object literal inference
 
-4. **IndexedAccess / Computed Member Access** (item #9) - Common pattern
+2. **IndexedAccess / Computed Member Access** (item #5) - Common pattern
    - Medium effort (1 hour)
    - Medium impact
    - Useful for array/object access
 
-5. **Nullish Coalescing Enhancement** (item #3) - Improves union type accuracy
+3. **Nullish Coalescing Enhancement** (item #2) - Improves union type accuracy
    - Low-medium effort (20-30 minutes)
    - Low-medium impact
    - Simple union type filtering
 
 ### Advanced Items (Longer Term)
 
-6. **Promise Static Methods** (item #2) - Async support
+4. **Promise Static Methods** (item #1) - Async support
    - Medium effort (30 minutes)
    - Medium impact
    - Requires Promise type support
 
-7. **Closures with Captured Variables** (item #11) - Improve closure inference
+5. **Closures with Captured Variables** (item #7) - Improve closure inference
    - Medium effort (may already work)
    - Medium impact
    - May just need verification tests
 
-8. **Type Narrowing** (item #8) - High value but complex
+6. **Type Narrowing** (item #4) - High value but complex
    - Very high effort (4+ hours)
    - Medium impact (improves accuracy significantly)
    - Requires control flow analysis
    - Unlocks other features
 
-9. **Class Property Tracking** (item #12) - Improves class inference
+7. **Class Property Tracking** (item #8) - Improves class inference
    - Very high effort (3-4 hours)
    - Medium-high impact
    - Depends on type narrowing
    - Significantly improves class features
 
-10. **this Context** (item #10) - Related to class property tracking
+8. **this Context** (item #6) - Related to class property tracking
     - High effort (2-3 hours)
     - Medium impact
     - Works with class property tracking
 
 ### Specialized Features (Lower Priority)
 
-11. **Generator Functions** (item #4) - Specialized use case
+9. **Generator Functions** (item #4) - Specialized use case
     - High effort (2 hours)
     - Low impact
     - Rarely used in minified code
 
-12. **Async Iterators** (item #5) - Advanced feature
+10. **Async Iterators** (item #5) - Advanced feature
     - High effort (2 hours)
     - Low impact
     - Very specialized
@@ -567,10 +522,4 @@ See CLAUDE.md for detailed test quality requirements and examples.
 - **High (2+ hours)**: 5 items (Generators, Async iterators, Type narrowing, this Context, Class property tracking)
 
 ### Quick Wins Available
-Implementing items #1 and #6 would take ~10 minutes and complete:
-- JSON methods (parse, stringify)
-- Symbol and BigInt literals
-
----
-
 **Note**: See [DONE.md](./DONE.md) for all completed features with examples and test results.

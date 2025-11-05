@@ -484,6 +484,8 @@ export class TypeResolver implements ITypeResolver {
         return { typeName: 'number', confidence: 1.0 };
       case 'BooleanLiteral':
         return { typeName: 'boolean', confidence: 1.0 };
+      case 'BigIntLiteral':
+        return { typeName: 'bigint', confidence: 1.0 };
       case 'NullLiteral':
         return { typeName: 'null', confidence: 1.0 };
       case 'TemplateLiteral':
@@ -634,13 +636,17 @@ export class TypeResolver implements ITypeResolver {
         const fullName = `${objectName}.${methodName}`;
 
         if (knownTypes.has(fullName)) {
+          // JSON.parse always returns any - use confidence 1.0
+          // JSON.stringify always returns string - use confidence 1.0
+          const confidence = (fullName === 'JSON.parse' || fullName === 'JSON.stringify') ? 1.0 : 0.9;
+
           baseType = {
             typeName: knownTypes.get(fullName)!,
-            confidence: 0.9
+            confidence
           };
           // If optional chaining, create union with undefined
           if (isOptional) {
-            return { typeName: `${baseType.typeName} | undefined`, confidence: 0.9 };
+            return { typeName: `${baseType.typeName} | undefined`, confidence };
           }
           return baseType;
         }
@@ -673,15 +679,28 @@ export class TypeResolver implements ITypeResolver {
     typeMap: TypeMap,
     depth: number
   ): InferredType {
-    if (['+', '-', '*', '/', '%', '**'].includes(node.operator)) {
-      if (node.operator === '+') {
-        const leftType = this.inferTypeFromNode(node.left, typeMap, depth);
-        const rightType = this.inferTypeFromNode(node.right, typeMap, depth);
-        if (leftType?.typeName === 'string' || rightType?.typeName === 'string') {
-          return { typeName: 'string', confidence: 0.8 };
-        }
-        return { typeName: 'number', confidence: 0.7 };
+    // Check for bigint arithmetic operators
+    if (['+', '-', '*', '/', '%', '**', '&', '|', '^', '<<', '>>', '>>>'].includes(node.operator)) {
+      const leftType = this.inferTypeFromNode(node.left, typeMap, depth);
+      const rightType = this.inferTypeFromNode(node.right, typeMap, depth);
+
+      // If both operands are bigint, result is bigint
+      if (leftType?.typeName === 'bigint' && rightType?.typeName === 'bigint') {
+        return { typeName: 'bigint', confidence: 1.0 };
       }
+
+      // Handle existing numeric/string logic
+      if (['+', '-', '*', '/', '%', '**'].includes(node.operator)) {
+        if (node.operator === '+') {
+          if (leftType?.typeName === 'string' || rightType?.typeName === 'string') {
+            return { typeName: 'string', confidence: 0.8 };
+          }
+          return { typeName: 'number', confidence: 0.7 };
+        }
+        return { typeName: 'number', confidence: 0.9 };
+      }
+
+      // Bitwise operators return number if not bigint
       return { typeName: 'number', confidence: 0.9 };
     }
 
@@ -707,8 +726,23 @@ export class TypeResolver implements ITypeResolver {
 
       case '+':
       case '-':
+        // Unary +/- preserves bigint type, otherwise returns number
+        // Note: We don't have access to typeMap here, so we need to check the argument directly
+        if (node.argument && t.isBigIntLiteral(node.argument)) {
+          return { typeName: 'bigint', confidence: 1.0 };
+        }
+        if (node.argument && t.isIdentifier(node.argument)) {
+          // For identifiers, we can't determine type without typeMap
+          // This will be handled by the type collector in the first pass
+          return { typeName: 'number', confidence: 0.7 };
+        }
+        return { typeName: 'number', confidence: 1.0 };
+
       case '~':
-        // Unary +, -, and bitwise NOT return number
+        // Bitwise NOT - check for bigint
+        if (node.argument && t.isBigIntLiteral(node.argument)) {
+          return { typeName: 'bigint', confidence: 1.0 };
+        }
         return { typeName: 'number', confidence: 1.0 };
 
       case 'void':

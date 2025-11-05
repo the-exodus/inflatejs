@@ -4,19 +4,19 @@ This document tracks all completed type inference features with their implementa
 
 ## Summary Statistics
 
-**Total Tests**: 753 passing, 0 skipped (ALL TESTS PASSING! 🎉)
+**Total Tests**: 790 passing, 0 skipped (ALL TESTS PASSING! 🎉)
 **Overall Coverage**: ~67% statements, ~58% branches, ~77% functions
 
 ### Completion by Phase
 
-- **Phase 1 (Foundation)**: ✅ COMPLETED (4/4 items, 75 tests)
+- **Phase 1 (Foundation)**: ✅ COMPLETED (6/6 items, 112 tests)
 - **Phase 2 (Common Patterns)**: ✅ COMPLETED (6/6 items, 144 tests)
 - **Phase 3 (Modern JavaScript)**: ✅ COMPLETED (4/4 items, 124 tests)
 - **Phase 4 (Advanced Features)**: ✅ COMPLETED (6/6 items, 173 tests)
 
 ---
 
-## Phase 1: Foundation Features (75 tests)
+## Phase 1: Foundation Features (112 tests)
 
 ### 1. Template Literals ✅ COMPLETED
 **Impact**: Very High (used in ~30% of modern JS)
@@ -184,9 +184,107 @@ const repeated = "x".repeat(3);
 
 ---
 
+### 5. JSON Methods ✅ COMPLETED
+**Impact**: Medium (commonly used)
+**Effort**: Low (5 minutes)
+**Tests**: 14 tests passing
+
+JSON.parse() and JSON.stringify() now correctly infer their return types.
+
+**Implementation notes**:
+- Added `JSON.parse` → `any` to known-types
+- Added `JSON.stringify` → `string` to known-types
+
+**Examples (all converted to tests):**
+```javascript
+// JSON.parse returns any (type annotation typically omitted for any)
+const parsed = JSON.parse('{"x":1}');
+// Result: parsed (any type - no annotation shown)
+
+// JSON.stringify always returns string
+const stringified = JSON.stringify({ x: 1, y: 2 });
+// Result: stringified: string ✅
+
+// With variable argument
+const obj = { name: "John", age: 30 };
+const json = JSON.stringify(obj);
+// Result: obj: { name: string, age: number }, json: string ✅
+
+// JSON roundtrip pattern
+const original = { x: 1, y: 2 };
+const str = JSON.stringify(original);
+const parsed = JSON.parse(str);
+// Result: str: string, parsed (any) ✅
+```
+
+**Test file**: `src/__tests__/json-methods.test.ts`
+
+---
+
+### 6. Symbol and BigInt ✅ COMPLETED
+**Impact**: Low-Medium (modern JS primitives)
+**Effort**: Low (10 minutes)
+**Tests**: 23 tests passing
+
+Symbol and BigInt primitives now correctly infer their types.
+
+**Implementation notes**:
+- Added `Symbol` → `symbol` to known-types
+- Added `BigInt` → `bigint` to known-types
+- Added BigIntLiteral support to TypeCollector and TypeResolver
+- Enhanced unary expression handling to preserve bigint type for `-100n`
+- Enhanced binary expression handling for bigint arithmetic
+
+**Examples (all converted to tests):**
+```javascript
+// Symbol constructor
+const sym = Symbol("key");
+// Result: sym: symbol ✅
+
+const id = Symbol("id");
+const name = Symbol("name");
+// Result: id: symbol, name: symbol ✅
+
+// BigInt literal
+const big = 100n;
+// Result: big: bigint ✅
+
+// BigInt constructor
+const computed = BigInt(100);
+// Result: computed: bigint ✅
+
+// BigInt arithmetic (operands and result are bigint)
+const a = 100n;
+const b = 200n;
+const sum = a + b;
+// Result: a: bigint, b: bigint, sum: bigint ✅
+
+// Negative bigint with unary minus
+const negative = -100n;
+// Result: negative: bigint ✅
+
+// BigInt comparison
+const big = 100n;
+const isLarge = big > 50n;
+// Result: big: bigint, isLarge: boolean ✅
+
+// Symbol in array
+const sym = Symbol("test");
+const arr = [sym];
+// Result: sym: symbol, arr: symbol[] ✅
+
+// BigInt in object
+const obj = { id: 1n, value: 100n };
+// Result: obj: { id: bigint, value: bigint } ✅
+```
+
+**Test file**: `src/__tests__/symbol-bigint.test.ts`
+
+---
+
 ## Phase 2: Common Patterns (144 tests)
 
-### 5. Logical Expressions (Value Usage) ✅ COMPLETED
+### 7. Logical Expressions (Value Usage) ✅ COMPLETED
 **Impact**: High (common for defaults)
 **Effort**: Medium (20 minutes)
 **Tests**: 30 tests passing
@@ -218,7 +316,7 @@ const value = input ?? defaultValue;
 
 ---
 
-### 6. RegExp Literals ✅ COMPLETED
+### 8. RegExp Literals ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low (5 minutes)
 **Tests**: 28 tests passing
@@ -243,7 +341,7 @@ const emailRegex = /^[a-z]+@[a-z]+\.[a-z]+$/i;
 
 ---
 
-### 7. Object Static Methods ✅ COMPLETED
+### 9. Object Static Methods ✅ COMPLETED
 **Impact**: Medium (common utilities)
 **Effort**: Low (10 minutes)
 **Tests**: 13 tests passing
@@ -271,7 +369,7 @@ const assigned = Object.assign({}, obj, { w: 4 });
 
 ---
 
-### 8. Array Static Methods ✅ COMPLETED
+### 10. Array Static Methods ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low (5 minutes)
 **Tests**: 8 tests passing
@@ -294,7 +392,7 @@ const filled = Array(5).fill(0);
 
 ---
 
-### 9. Type Conversion Functions ✅ COMPLETED
+### 11. Type Conversion Functions ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low (5 minutes)
 **Tests**: 12 tests passing
@@ -320,7 +418,7 @@ const bool = Boolean(1);
 
 ---
 
-### 10. Union Type Inference ✅ COMPLETED
+### 12. Union Type Inference ✅ COMPLETED
 **Impact**: High (improves type accuracy significantly)
 **Effort**: Medium (1-2 hours)
 **Tests**: 22 tests passing
@@ -366,7 +464,7 @@ const b = flag2 ? a : "z";     // string (all branches are string)
 
 ---
 
-### 11. Context-Aware Method Inference ✅ COMPLETED
+### 13. Context-Aware Method Inference ✅ COMPLETED
 **Impact**: Medium-High (very common method)
 **Effort**: Medium (1-2 hours)
 **Tests**: 31 tests passing
@@ -405,7 +503,7 @@ const result = flag ? arr.slice(0, 2) : [4, 5];
 
 ## Phase 3: Modern JavaScript (124 tests)
 
-### 12. Default Parameters ✅ COMPLETED
+### 14. Default Parameters ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low-Medium (30 minutes)
 **Tests**: 33 tests passing
@@ -438,7 +536,7 @@ function increment(x, delta = 1) {
 
 ---
 
-### 13. Rest Parameters ✅ COMPLETED
+### 15. Rest Parameters ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Medium (1 hour)
 **Tests**: 27 tests passing
@@ -471,7 +569,7 @@ function log(message, ...args) {
 
 ---
 
-### 14. Optional Chaining ✅ COMPLETED
+### 16. Optional Chaining ✅ COMPLETED
 **Impact**: Medium (ES2020 feature)
 **Effort**: High (2 hours)
 **Tests**: 29 feature tests + 4 compilation tests + 3 confidence score tests
@@ -492,7 +590,7 @@ const result = obj?.method?.();
 
 ---
 
-### 15. Spread Operator ✅ COMPLETED
+### 17. Spread Operator ✅ COMPLETED
 **Impact**: Medium (common in modern code)
 **Effort**: Medium (1 hour)
 **Tests**: 29 feature tests + 6 compilation tests + 5 confidence score tests
@@ -523,7 +621,7 @@ const max = Math.max(...nums);
 
 ## Phase 4: Advanced Features (171 tests)
 
-### 16. Object Literal Shape Types ✅ COMPLETED
+### 18. Object Literal Shape Types ✅ COMPLETED
 **Impact**: High (enables destructuring)
 **Effort**: High (2-3 hours)
 **Tests**: 20 tests passing
@@ -562,7 +660,7 @@ const state = { items: [1, 2, 3], active: true };
 
 ---
 
-### 17. Destructured Variable Type Propagation ✅ COMPLETED
+### 19. Destructured Variable Type Propagation ✅ COMPLETED
 **Impact**: Medium
 **Effort**: Low (15 minutes - one-line fix!)
 **Tests**: 5 tests re-enabled (all passing)
@@ -595,7 +693,7 @@ const {user: {name}} = data;
 
 ---
 
-### 18. Destructuring ✅ COMPLETED
+### 20. Destructuring ✅ COMPLETED
 **Impact**: Medium-High (ES6+ standard)
 **Effort**: High (2-3 hours)
 **Tests**: 46 tests passing (31 feature + 10 compilation + 5 confidence)
@@ -653,7 +751,7 @@ const {x, y = 2} = obj;
 
 ---
 
-### 19. Class Features ✅ COMPLETED
+### 21. Class Features ✅ COMPLETED
 **Impact**: Medium
 **Effort**: High (3-4 hours)
 **Tests**: 50 tests passing (38 feature + 7 compilation + 5 confidence)
@@ -733,7 +831,7 @@ class Counter {
 
 ---
 
-### 20. Chained Method Calls ✅ COMPLETED
+### 22. Chained Method Calls ✅ COMPLETED
 **Impact**: High (common pattern)
 **Effort**: Medium
 **Tests**: 26 tests passing
@@ -762,7 +860,7 @@ const result = "hello,world,test"
 
 ---
 
-### 21. Callback Type Inference ✅ COMPLETED
+### 23. Callback Type Inference ✅ COMPLETED
 **Impact**: High (very useful)
 **Effort**: Very High (4+ hours)
 **Tests**: 27/27 tests passing (ALL COMPLETE!)
@@ -867,7 +965,9 @@ For each completed feature, all 5 test types were created:
 - Unary expressions
 - Ternary operators
 - Missing array/string methods in known-types
-- **Result**: 75 new tests, coverage improved from ~50% to ~75%+
+- JSON methods
+- Symbol and BigInt
+- **Result**: 112 new tests, coverage improved from ~50% to ~75%+
 
 ### Phase 2 (2-3 hours): Common Patterns ✅ COMPLETED
 - Logical expressions for values
@@ -911,19 +1011,21 @@ The following files were modified to implement these features:
 - `src/__tests__/template-literals.test.ts` (8 tests)
 - `src/__tests__/unary-expressions.test.ts` (18 tests)
 - `src/__tests__/conditional-expressions.test.ts` (15 tests)
-- `src/__tests__/logical-expressions.test.ts` (30 tests)
 - `src/__tests__/array-string-methods.test.ts` (35 tests)
+- `src/__tests__/json-methods.test.ts` (14 tests)
+- `src/__tests__/symbol-bigint.test.ts` (23 tests)
+- `src/__tests__/logical-expressions.test.ts` (30 tests)
 - `src/__tests__/regexp-literals.test.ts` (28 tests)
 - `src/__tests__/static-methods.test.ts` (33 tests)
 - `src/__tests__/union-types.test.ts` (22 tests)
 - `src/__tests__/context-aware-methods.test.ts` (31 tests)
 - `src/__tests__/default-parameters.test.ts` (33 tests)
 - `src/__tests__/rest-parameters.test.ts` (27 tests)
-- `src/__tests__/optional-chaining.test.ts` (36 tests)
-- `src/__tests__/spread-operator.test.ts` (40 tests)
+- `src/__tests__/optional-chaining.test.ts` (29 tests)
+- `src/__tests__/spread-operator.test.ts` (29 tests)
 - `src/__tests__/object-literal-shapes.test.ts` (20 tests)
-- `src/__tests__/destructuring.test.ts` (46 tests)
-- `src/__tests__/class-features.test.ts` (50 tests)
+- `src/__tests__/destructuring.test.ts` (31 tests)
+- `src/__tests__/class-features.test.ts` (38 tests)
 - `src/__tests__/chained-methods.test.ts` (26 tests)
 - `src/__tests__/callback-type-inference.test.ts` (27 tests)
 

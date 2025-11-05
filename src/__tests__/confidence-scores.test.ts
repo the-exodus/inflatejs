@@ -701,4 +701,50 @@ describe('Confidence Score Validation', () => {
       }
     });
   });
+
+  describe('JSON methods should have confidence 1.0', () => {
+    it('should assign 1.0 confidence to JSON.parse (returns any)', () => {
+      const code = 'const data = JSON.parse(\'{"x":1}\');';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      const dataType = typeMap.get('data');
+      expect(dataType).toBeDefined();
+      expect(dataType!.typeName).toBe('any');
+      expect(dataType!.confidence).toBe(1.0);
+    });
+
+    it('should assign 1.0 confidence to JSON.stringify (returns string)', () => {
+      const code = 'const str = JSON.stringify({x: 1});';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      const strType = typeMap.get('str');
+      expect(strType).toBeDefined();
+      expect(strType!.typeName).toBe('string');
+      expect(strType!.confidence).toBe(1.0);
+    });
+
+    it('should assign 1.0 confidence in realistic usage', () => {
+      // Test JSON methods in a realistic code pattern
+      const code = 'const config = {theme: "dark"}; const stored = JSON.stringify(config); const loaded = JSON.parse(stored);';
+      const ast = parse(code, { sourceType: 'module' });
+      const collector = new TypeCollector();
+      const typeMap = collector.collectTypes(ast);
+
+      // JSON.stringify should return string with confidence 1.0
+      const storedType = typeMap.get('stored');
+      expect(storedType).toBeDefined();
+      expect(storedType!.typeName).toBe('string');
+      expect(storedType!.confidence).toBe(1.0);
+
+      // JSON.parse should return any with confidence 1.0
+      const loadedType = typeMap.get('loaded');
+      expect(loadedType).toBeDefined();
+      expect(loadedType!.typeName).toBe('any');
+      expect(loadedType!.confidence).toBe(1.0);
+    });
+  });
 });

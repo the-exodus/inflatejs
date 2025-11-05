@@ -458,6 +458,8 @@ export class TypeCollector implements ITypeCollector {
         return { typeName: 'number', confidence: 1.0 };
       case 'BooleanLiteral':
         return { typeName: 'boolean', confidence: 1.0 };
+      case 'BigIntLiteral':
+        return { typeName: 'bigint', confidence: 1.0 };
       case 'NullLiteral':
         return { typeName: 'null', confidence: 1.0 };
       case 'TemplateLiteral':
@@ -699,9 +701,13 @@ export class TypeCollector implements ITypeCollector {
       const fullName = `${objectName}.${methodName}`;
 
       if (knownTypes.has(fullName)) {
+        // JSON.parse always returns any - use confidence 1.0
+        // JSON.stringify always returns string - use confidence 1.0
+        const confidence = (fullName === 'JSON.parse' || fullName === 'JSON.stringify') ? 1.0 : 0.9;
+
         return wrapIfOptional({
           typeName: knownTypes.get(fullName)!,
-          confidence: 0.9
+          confidence
         });
       }
     }
@@ -770,8 +776,17 @@ export class TypeCollector implements ITypeCollector {
 
       case '+':
       case '-':
+        // Unary +/- preserves bigint type, otherwise returns number
+        if (node.argument) {
+          const argType = this.inferTypeFromNode(node.argument);
+          if (argType && argType.typeName === 'bigint') {
+            return { typeName: 'bigint', confidence: 1.0 };
+          }
+        }
+        return { typeName: 'number', confidence: 1.0 };
+
       case '~':
-        // Unary +, -, and bitwise NOT return number
+        // Bitwise NOT returns number (bigint uses different operator)
         return { typeName: 'number', confidence: 1.0 };
 
       case 'void':
@@ -879,6 +894,17 @@ export class TypeCollector implements ITypeCollector {
     // Comparison operators always return boolean
     if (['==', '===', '!=', '!==', '<', '<=', '>', '>=', 'in', 'instanceof'].includes(node.operator)) {
       return { typeName: 'boolean', confidence: 1.0 };
+    }
+
+    // Check for bigint arithmetic operators
+    if (['+', '-', '*', '/', '%', '**', '&', '|', '^', '<<', '>>', '>>>'].includes(node.operator)) {
+      const leftType = this.inferTypeFromNode(node.left);
+      const rightType = this.inferTypeFromNode(node.right);
+
+      // If both operands are bigint, result is bigint
+      if (leftType?.typeName === 'bigint' && rightType?.typeName === 'bigint') {
+        return { typeName: 'bigint', confidence: 1.0 };
+      }
     }
 
     // Bitwise and arithmetic operators (except +) return number
