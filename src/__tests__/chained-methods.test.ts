@@ -100,10 +100,10 @@ describe('Chained Method Calls', () => {
       const code = 'const data="1,2,3,4,5";const nums=data.split(",").map(s=>parseInt(s)).filter(n=>n>2);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: Callback return type inference not yet implemented (item 27 in TODO.md)
-      // parseInt is not in known types, so map() preserves the array element type (string)
-      // This is expected behavior until callback return type inference is implemented
-      expect(result).toMatch(/nums:\s*string\[\]/);
+      // Callback return type inference now implemented! (item 27 in TODO.md)
+      // parseInt returns number, so after map the array is number[]
+      // The filter comparison n>2 also confirms number type
+      expect(result).toMatch(/nums:\s*number\[\]/);
     });
   });
 
@@ -160,7 +160,9 @@ describe('Chained Method Calls', () => {
       const code = 'const result=[].map(x=>x*2).filter(x=>x>0);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toMatch(/result:\s*any\[\]/);
+      // Callback return type inference now implemented!
+      // Even though input is any[], the callback x=>x*2 returns number, so result is number[]
+      expect(result).toMatch(/result:\s*number\[\]/);
     });
 
     it('should handle chain on propagated variable', async () => {

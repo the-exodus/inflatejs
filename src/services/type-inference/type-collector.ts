@@ -543,10 +543,15 @@ export class TypeCollector implements ITypeCollector {
       });
 
       if (allSameType) {
-        return {
+        // Preserve properties field if element type has it (for object literal arrays)
+        const arrayType: InferredType = {
           typeName: `${firstValidType.typeName}[]`,
           confidence: 0.9
         };
+        if (firstValidType.properties) {
+          arrayType.properties = firstValidType.properties;
+        }
+        return arrayType;
       }
     }
 
@@ -1049,11 +1054,14 @@ export class TypeCollector implements ITypeCollector {
     const arrayTypeName = arrayType.typeName;
     let elementType: InferredType;
 
-    if (arrayTypeName.endsWith('[]')) {
-      // Standard array notation: number[], string[], etc.
-      const baseType = arrayTypeName.slice(0, -2);
-      elementType = { typeName: baseType, confidence: arrayType.confidence };
-    } else if (arrayTypeName.match(/^\{\s*.+\s*\}\[\]$/)) {
+    // Special case: if array type is just 'any' with confidence 0 (untyped function parameter),
+    // element should be 'any'. Don't apply this to intermediate 'any' types with higher confidence
+    // that will be refined later.
+    if (arrayTypeName === 'any' && arrayType.confidence === 0) {
+      elementType = { typeName: 'any', confidence: 0.95 };
+    }
+    // Check for object literal shape arrays FIRST (before generic endsWith check)
+    else if (arrayTypeName.match(/^\{\s*.+\s*\}\[\]$/)) {
       // Object literal shape array: { name: string, age: number }[]
       const objectType = arrayTypeName.slice(0, -2);
       elementType = {
@@ -1061,6 +1069,10 @@ export class TypeCollector implements ITypeCollector {
         confidence: arrayType.confidence,
         properties: arrayType.properties
       };
+    } else if (arrayTypeName.endsWith('[]')) {
+      // Standard array notation: number[], string[], etc.
+      const baseType = arrayTypeName.slice(0, -2);
+      elementType = { typeName: baseType, confidence: arrayType.confidence };
     } else {
       // Unknown array type format
       return null;
@@ -1092,9 +1104,18 @@ export class TypeCollector implements ITypeCollector {
     if (paramIndex === 0) {
       if (methodName === 'reduce' || methodName === 'reduceRight') {
         // First parameter is accumulator - type comes from initial value or element type
-        return initialValueType || elementType;
+        const accType = initialValueType || elementType;
+        // If accumulator type is 'any', boost confidence to prevent usage-based override
+        if (accType.typeName === 'any' && accType.confidence < 0.95) {
+          return { ...accType, confidence: 0.95 };
+        }
+        return accType;
       } else {
         // First parameter is current element
+        // If element type is 'any', boost confidence to prevent usage-based override
+        if (elementType.typeName === 'any' && elementType.confidence < 0.95) {
+          return { ...elementType, confidence: 0.95 };
+        }
         return elementType;
       }
     }
@@ -1103,6 +1124,10 @@ export class TypeCollector implements ITypeCollector {
     if (paramIndex === 1) {
       if (methodName === 'reduce' || methodName === 'reduceRight') {
         // Second parameter is current element
+        // If element type is 'any', boost confidence to prevent usage-based override
+        if (elementType.typeName === 'any' && elementType.confidence < 0.95) {
+          return { ...elementType, confidence: 0.95 };
+        }
         return elementType;
       } else {
         // Second parameter is index (number)

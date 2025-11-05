@@ -157,7 +157,8 @@ describe('Confidence Score Validation', () => {
       const doubledType = typeMap.get('doubled');
       expect(doubledType).toBeDefined();
       expect(doubledType!.typeName).toBe('number[]');
-      expect(doubledType!.confidence).toBeGreaterThanOrEqual(0.9);
+      // Callback return type inference applies 0.9 confidence: 0.9 (method) * 0.9 (callback) = 0.81
+      expect(doubledType!.confidence).toBeGreaterThanOrEqual(0.8);
     });
   });
 

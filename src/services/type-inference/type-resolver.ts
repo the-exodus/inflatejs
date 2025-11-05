@@ -558,7 +558,15 @@ export class TypeResolver implements ITypeResolver {
       });
 
       if (allSameType) {
-        return { typeName: `${firstValidType.typeName}[]`, confidence: 0.9 };
+        // Preserve properties field if element type has it (for object literal arrays)
+        const arrayType: InferredType = {
+          typeName: `${firstValidType.typeName}[]`,
+          confidence: 0.9
+        };
+        if (firstValidType.properties) {
+          arrayType.properties = firstValidType.properties;
+        }
+        return arrayType;
       }
     }
 
