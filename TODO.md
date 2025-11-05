@@ -1209,11 +1209,13 @@ For each TODO item:
 ### Phase 4 Progress
 - Item 16 (Class features): Added 50 new tests (38 feature + 7 compilation + 5 confidence), all passing ✅
 - Item 15 (Destructuring): Added 42 new tests, 6 passing (parameter destructuring), 25 skipped (variable declarations blocked on #7b) ⚠️
+- Item 7b (Object Literal Shape Types): Added to Phase 4 as prerequisite for completing #15 - not yet started 🚫
 - Total test count: 694 (up from 652), but 25 destructuring tests skipped
-- **Phase 4: 1.5 of 4 items complete** (Class features complete, Destructuring partial)
+- **Phase 4: 1.5 of 5 items complete** (Class features complete, Destructuring partial, Object Literal Shape Types needed)
 
-### Phase 4 (4+ hours): Advanced Features
+### Phase 4 (6-7+ hours): Advanced Features
 15. Destructuring ⚠️ (Parameter destructuring only - variable declarations blocked on #7b)
+7b. Object Literal Shape Types 🚫 (Prerequisite for completing #15 - see Priority 2)
 16. Class features ✅
 17. Callback type inference
 18. Type narrowing
