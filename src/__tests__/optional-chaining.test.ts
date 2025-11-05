@@ -12,8 +12,8 @@ describe('Optional Chaining', () => {
       const code = 'const user={name:"John"};const userName=user?.name;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Should infer any | undefined since we don't track object shapes
-      expect(result).toMatch(/userName:\s*(any \| undefined|undefined \| any)/);
+      // Should infer string | undefined (object shape tracking now works!)
+      expect(result).toMatch(/userName:\s*(string \| undefined|undefined \| string)/);
     });
 
     it('should infer union type for nested optional property access', async () => {
@@ -32,12 +32,12 @@ describe('Optional Chaining', () => {
       expect(result).toMatch(/value:\s*(any \| undefined|undefined \| any)/);
     });
 
-    it('should infer any | undefined for unknown property', async () => {
+    it('should infer number | undefined for known property', async () => {
       const code = 'const obj={count:42};const val=obj?.count;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Should infer any | undefined since we don't track object properties
-      expect(result).toMatch(/val:\s*(any \| undefined|undefined \| any)/);
+      // Should infer number | undefined (object shape tracking now works!)
+      expect(result).toMatch(/val:\s*(number \| undefined|undefined \| number)/);
     });
 
     it('should handle optional access on object literal', async () => {
@@ -143,8 +143,8 @@ describe('Optional Chaining', () => {
       const code = 'function log(val){return val;}const obj={msg:"test"};const result=log(obj?.msg);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Should infer union type when optional value is passed as argument
-      expect(result).toMatch(/result:\s*(any \| undefined|undefined \| any)/);
+      // Should infer string | undefined when optional value is passed as argument
+      expect(result).toMatch(/result:\s*(string \| undefined|undefined \| string)/);
     });
   });
 
@@ -252,7 +252,7 @@ describe('Optional Chaining', () => {
 
       // Should contain optional chaining syntax and type annotation
       expect(result).toContain('?.');
-      expect(result).toMatch(/val:\s*(any \| undefined|undefined \| any)/);
+      expect(result).toMatch(/val:\s*(number \| undefined|undefined \| number)/);
     });
 
     it('should preserve optional chaining in output', async () => {

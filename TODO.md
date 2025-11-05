@@ -934,27 +934,57 @@ function process(value) {
 }
 ```
 
-### 27. Callback Type Inference
+### 27. Callback Type Inference ✅ PARTIALLY COMPLETED
 **Impact**: High (very useful)
 **Effort**: Very High (4+ hours - requires sophisticated analysis)
 
-Infer parameter types in callbacks from array element types.
+~~Infer parameter types in callbacks from array element types.~~
 
-**Examples for tests:**
+**Status**: Partially implemented - callback parameters AND return types now work for map/filter/forEach!
+
+**What works:**
+- ✅ Callback parameter type inference from array element types
+- ✅ Callback return type inference for map/flatMap methods
+- ✅ Handles simple callbacks: `x => x * 2`
+- ✅ Handles complex expressions: `w => w.length`
+- ✅ Handles block statements with return
+- ✅ Works with chained methods: `nums.map(...).filter(...).map(...)`
+- ✅ Scope-aware parameter renaming (fixes multiple params with same original name)
+- ✅ 20/27 tests passing (74%)
+
+**Implementation notes:**
+- ✅ Enhanced TypeCollector to infer callback parameter types via `inferCallbackContext()` and `inferCallbackParameterType()`
+- ✅ Enhanced TypeResolver to infer callback return types via `inferCallbackReturnType()`
+- ✅ Modified `inferMethodReturnType()` to accept `callNode` and `typeMap` for context
+- ✅ Implemented scope-aware typeMap updates in UnminificationPipeline to handle parameter renaming
+- ✅ Lowered variable annotation confidence threshold from 0.7 to 0.5 to support chained method calls
+- ✅ Each method in a chain applies 0.9 confidence penalty, so 3 chained methods = 0.729 confidence
+
+**Known limitations (7 tests failing):**
+- ❌ `reduce` method not yet implemented (4 tests) - Phase 4 optional
+- ❌ Object property access in callbacks returns wrong type (1 test) - `users.map(u => u.name)` infers object type instead of property type
+- ❌ Empty array callbacks fall back to `any` (1 test) - expected behavior
+- ❌ Untyped array parameters (1 test) - `function(arr) { arr.map(...) }`
+
+**Examples that now work:**
 ```javascript
 const numbers = [1, 2, 3, 4, 5];
 
-// Callback parameter should be inferred as number
+// Callback parameter AND return type inferred
 const doubled = numbers.map(x => x * 2);
-// Expected: x: number, doubled: number[]
+// Output: (param: number) => ... doubled: number[]
 
 const filtered = numbers.filter(x => x > 2);
-// Expected: x: number, filtered: number[]
+// Output: (param: number) => ... filtered: number[]
 
-// String array
+// String array with property access
 const words = ["hello", "world"];
 const lengths = words.map(word => word.length);
-// Expected: word: string, lengths: number[]
+// Output: (param: string) => ... lengths: number[]
+
+// Chained methods
+const result = nums.map(x => x * 2).filter(x => x > 5).map(x => x + 1);
+// Output: All callbacks typed correctly, result: number[]
 ```
 
 ### 28. Chained Method Calls ✅ COMPLETED

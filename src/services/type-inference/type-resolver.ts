@@ -240,7 +240,7 @@ export class TypeResolver implements ITypeResolver {
         }
 
         if (objType) {
-          return this.inferMethodReturnType(objType.typeName, methodName);
+          return this.inferMethodReturnType(objType.typeName, methodName, node, typeMap);
         }
       }
       // Function calls
@@ -270,8 +270,17 @@ export class TypeResolver implements ITypeResolver {
 
   /**
    * Infer method return type based on object type and method name
+   * @param objType - The type of the object the method is called on
+   * @param methodName - The name of the method
+   * @param callNode - Optional call expression node (for callback analysis)
+   * @param typeMap - Optional type map (for callback analysis)
    */
-  private inferMethodReturnType(objType: string, methodName: string): InferredType | null {
+  private inferMethodReturnType(
+    objType: string,
+    methodName: string,
+    callNode?: t.CallExpression,
+    typeMap?: TypeMap
+  ): InferredType | null {
     if (objType === 'string') {
       // Methods that return string[]
       if (['split'].includes(methodName)) {
@@ -293,17 +302,58 @@ export class TypeResolver implements ITypeResolver {
       // Extract element type from array type (e.g., "number[]" -> "number")
       const elementType = objType.slice(0, -2);
 
-      // Methods that return the same array type
-      if (['map', 'filter', 'slice', 'concat', 'reverse', 'sort', 'flat'].includes(methodName)) {
+      // Methods that transform element types based on callback
+      if (['map', 'flatMap'].includes(methodName) && callNode && typeMap && callNode.arguments.length > 0) {
+        const callback = callNode.arguments[0];
+
+        if (process.env.DEBUG_CALLBACK) {
+          console.log('[DEBUG] Checking callback for method:', methodName);
+          console.log('[DEBUG] Callback node type:', callback?.type);
+          console.log('[DEBUG] Is ArrowFunctionExpression?', t.isArrowFunctionExpression(callback));
+        }
+
+        if (callback && (t.isFunctionExpression(callback) || t.isArrowFunctionExpression(callback))) {
+          // Analyze callback return type
+          const callbackReturnType = this.inferCallbackReturnType(callback, typeMap);
+
+          if (process.env.DEBUG_CALLBACK) {
+            console.log('[DEBUG] Callback return type inferred:', callbackReturnType);
+          }
+
+          if (callbackReturnType && callbackReturnType.confidence >= 0.5) {
+            // map transforms to new element type
+            if (methodName === 'map') {
+              return {
+                typeName: `${callbackReturnType.typeName}[]`,
+                confidence: callbackReturnType.confidence * 0.9
+              };
+            }
+            // flatMap also transforms, but result is flattened
+            if (methodName === 'flatMap') {
+              // If callback returns an array, flatten it
+              if (callbackReturnType.typeName.includes('[]')) {
+                return {
+                  typeName: callbackReturnType.typeName,
+                  confidence: callbackReturnType.confidence * 0.9
+                };
+              }
+              // Otherwise, wrap in array
+              return {
+                typeName: `${callbackReturnType.typeName}[]`,
+                confidence: callbackReturnType.confidence * 0.9
+              };
+            }
+          }
+        }
+      }
+
+      // Methods that return the same array type (including filter)
+      if (['map', 'filter', 'slice', 'concat', 'reverse', 'sort', 'flat', 'flatMap'].includes(methodName)) {
         return { typeName: objType, confidence: 0.9 };
       }
       // Methods that return element type | undefined
       if (['pop', 'shift', 'find'].includes(methodName)) {
         return { typeName: `${elementType} | undefined`, confidence: 0.9 };
-      }
-      // flatMap returns flattened array
-      if (methodName === 'flatMap') {
-        return { typeName: objType, confidence: 0.9 };
       }
       // Methods that return string
       if (['join'].includes(methodName)) {
@@ -334,25 +384,66 @@ export class TypeResolver implements ITypeResolver {
   }
 
   /**
+   * Infer the return type of a callback function by analyzing its body
+   * @param callback - The callback function (FunctionExpression or ArrowFunctionExpression)
+   * @param typeMap - Type map for resolving variable types
+   */
+  private inferCallbackReturnType(
+    callback: t.FunctionExpression | t.ArrowFunctionExpression,
+    typeMap: TypeMap
+  ): InferredType | null {
+    // Arrow function with expression body (e.g., x => x * 2)
+    if (t.isArrowFunctionExpression(callback) && !t.isBlockStatement(callback.body)) {
+      return this.inferTypeFromNode(callback.body as t.Expression, typeMap, 0);
+    }
+
+    // Block statement body - look for return statements
+    if (t.isBlockStatement(callback.body)) {
+      let returnType: InferredType | null = null;
+
+      for (const stmt of callback.body.body) {
+        if (t.isReturnStatement(stmt) && stmt.argument) {
+          const argType = this.inferTypeFromNode(stmt.argument, typeMap, 0);
+          if (argType && (!returnType || argType.confidence > returnType.confidence)) {
+            returnType = argType;
+          }
+        }
+      }
+
+      return returnType;
+    }
+
+    return null;
+  }
+
+  /**
    * Infer the type of a property access (not a method call)
    */
-  private inferPropertyType(objType: string, propertyName: string): InferredType | null {
+  private inferPropertyType(objType: InferredType | string, propertyName: string): InferredType | null {
+    // Extract typeName string from InferredType if needed
+    const typeName = typeof objType === 'string' ? objType : objType.typeName;
+
+    // Check object shape properties first (for object literal shapes)
+    if (typeof objType !== 'string' && objType.properties && objType.properties[propertyName]) {
+      return objType.properties[propertyName];
+    }
+
     // Handle .length property
     if (propertyName === 'length') {
-      if (objType === 'string' || objType.includes('[]')) {
+      if (typeName === 'string' || typeName.includes('[]')) {
         return { typeName: 'number', confidence: 1.0 };
       }
     }
 
     // Handle common properties
-    if (objType === 'string') {
+    if (typeName === 'string') {
       // String properties that return string
       if (['constructor'].includes(propertyName)) {
         return { typeName: 'Function', confidence: 0.8 };
       }
     }
 
-    if (objType.includes('[]')) {
+    if (typeName.includes('[]')) {
       // Array properties
       if (['constructor'].includes(propertyName)) {
         return { typeName: 'Function', confidence: 0.8 };
@@ -497,7 +588,7 @@ export class TypeResolver implements ITypeResolver {
       }
 
       if (objType) {
-        const methodReturnType = this.inferMethodReturnType(objType.typeName, methodName);
+        const methodReturnType = this.inferMethodReturnType(objType.typeName, methodName, node, typeMap);
         if (methodReturnType) {
           baseType = methodReturnType;
           // If optional chaining, create union with undefined
@@ -615,6 +706,19 @@ export class TypeResolver implements ITypeResolver {
     // Handle known properties
     if (t.isIdentifier(node.property)) {
       const propertyName = node.property.name;
+
+      // Check object shape properties first (for object literal shapes)
+      if (objectType && objectType.properties && objectType.properties[propertyName]) {
+        const propType = objectType.properties[propertyName];
+        // If optional chaining, add undefined to union
+        if ((node as any).optional) {
+          return {
+            typeName: `${propType.typeName} | undefined`,
+            confidence: propType.confidence * 0.9
+          };
+        }
+        return propType;
+      }
 
       // Handle .length property
       if (propertyName === 'length') {
@@ -764,7 +868,7 @@ export class TypeResolver implements ITypeResolver {
             }
 
             if (objType) {
-              inferredType = this.inferMethodReturnType(objType.typeName, methodName);
+              inferredType = this.inferMethodReturnType(objType.typeName, methodName, init, typeMap);
             }
           }
           // Function calls (func())
@@ -806,7 +910,8 @@ export class TypeResolver implements ITypeResolver {
             const objType = typeMap.get(init.object.name);
             if (objType) {
               // This is property access, not a method call
-              inferredType = this.inferPropertyType(objType.typeName, init.property.name);
+              // Pass full InferredType to enable object shape property access
+              inferredType = this.inferPropertyType(objType, init.property.name);
             }
           }
         }

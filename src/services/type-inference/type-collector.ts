@@ -283,6 +283,12 @@ export class TypeCollector implements ITypeCollector {
             callbackContext.methodName,
             callbackContext.initialValueType
           );
+          if (process.env.DEBUG_CALLBACK) {
+            console.log('[DEBUG TypeCollector] handleFunctionParameters');
+            console.log('[DEBUG TypeCollector]   param name:', param.name);
+            console.log('[DEBUG TypeCollector]   param index:', index);
+            console.log('[DEBUG TypeCollector]   inferred paramType:', paramType);
+          }
         }
 
         typeMap.set(param.name, paramType);
@@ -1010,6 +1016,12 @@ export class TypeCollector implements ITypeCollector {
     if (t.isIdentifier(memberExpr.object)) {
       // Simple case: arr.map(...)
       arrayType = typeMap.get(memberExpr.object.name) || null;
+      if (process.env.DEBUG_CALLBACK) {
+        console.log('[DEBUG TypeCollector] inferCallbackContext simple case');
+        console.log('[DEBUG TypeCollector]   object name:', memberExpr.object.name);
+        console.log('[DEBUG TypeCollector]   method name:', methodName);
+        console.log('[DEBUG TypeCollector]   arrayType from typeMap:', arrayType);
+      }
     } else if (t.isCallExpression(memberExpr.object) && t.isMemberExpression(memberExpr.object.callee)) {
       // Chained case: arr.filter(...).map(...)
       // Try to infer from the previous method's return type

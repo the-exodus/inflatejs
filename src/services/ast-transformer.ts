@@ -55,14 +55,20 @@ export class ASTTransformer implements IASTTransformer {
         // Rename parameters
         path.node.params.forEach((param, index) => {
           if (t.isIdentifier(param)) {
+            const originalName = param.name;
             const newName = scopeManager.getOrCreateMapping(param.name, scopeId, {
               isParameter: true,
               parameterIndex: index,
               scope: scopeId
             });
 
-            if (newName !== param.name) {
-              path.scope.rename(param.name, newName);
+            if (newName !== originalName) {
+              // Store original name on the binding before renaming
+              const binding = path.scope.getBinding(originalName);
+              if (binding && binding.identifier) {
+                (binding.identifier as any)._originalName = originalName;
+              }
+              path.scope.rename(originalName, newName);
             }
           }
         });
@@ -74,14 +80,20 @@ export class ASTTransformer implements IASTTransformer {
         // Rename parameters
         path.node.params.forEach((param, index) => {
           if (t.isIdentifier(param)) {
+            const originalName = param.name;
             const newName = scopeManager.getOrCreateMapping(param.name, scopeId, {
               isParameter: true,
               parameterIndex: index,
               scope: scopeId
             });
 
-            if (newName !== param.name) {
-              path.scope.rename(param.name, newName);
+            if (newName !== originalName) {
+              // Store original name on the binding before renaming
+              const binding = path.scope.getBinding(originalName);
+              if (binding && binding.identifier) {
+                (binding.identifier as any)._originalName = originalName;
+              }
+              path.scope.rename(originalName, newName);
             }
           }
         });
@@ -93,14 +105,20 @@ export class ASTTransformer implements IASTTransformer {
         // Rename parameters
         path.node.params.forEach((param, index) => {
           if (t.isIdentifier(param)) {
+            const originalName = param.name;
             const newName = scopeManager.getOrCreateMapping(param.name, scopeId, {
               isParameter: true,
               parameterIndex: index,
               scope: scopeId
             });
 
-            if (newName !== param.name) {
-              path.scope.rename(param.name, newName);
+            if (newName !== originalName) {
+              // Store original name on the binding before renaming
+              const binding = path.scope.getBinding(originalName);
+              if (binding && binding.identifier) {
+                (binding.identifier as any)._originalName = originalName;
+              }
+              path.scope.rename(originalName, newName);
             }
           }
         });

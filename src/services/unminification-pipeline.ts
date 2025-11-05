@@ -305,7 +305,10 @@ export class UnminificationPipeline implements IUnminificationPipeline {
           const varName = path.node.id.name;
           const varType = typeMap.get(varName);
 
-          if (varType && varType.confidence >= 0.7 && varType.typeName !== 'any') {
+          // Lower threshold for variables (0.5) to allow chained method calls
+          // Each method in a chain applies a 0.9 confidence penalty, so after 3 methods
+          // we're at 0.729, and after array transformation callbacks we can be around 0.6-0.65
+          if (varType && varType.confidence >= 0.5 && varType.typeName !== 'any') {
             path.node.id.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
           }
         }
@@ -554,7 +557,7 @@ export class UnminificationPipeline implements IUnminificationPipeline {
     const newTypeMap: TypeMap = new Map();
     const renameMappings = this.scopeManager.getAllRenameMappings();
 
-    // Update typeMap keys based on rename mappings
+    // Start with the basic flat mapping approach (works for most variables)
     for (const [originalName, typeInfo] of oldTypeMap.entries()) {
       const renamedName = renameMappings.get(originalName);
 
@@ -562,12 +565,50 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         // Variable was renamed, use the new name
         newTypeMap.set(renamedName, typeInfo);
       } else {
-        // Variable was not renamed (e.g., non-minified names), keep original name
+        // Variable was not renamed, keep original name
         newTypeMap.set(originalName, typeInfo);
       }
     }
 
+    // Now handle function parameters with scope-aware lookup
+    // This fixes the issue where multiple parameters have the same original name in different scopes
+    traverse(ast, {
+      ArrowFunctionExpression: (path: any) => {
+        this.updateParameterTypes(path.node.params, path.scope, oldTypeMap, newTypeMap);
+      },
+      FunctionExpression: (path: any) => {
+        this.updateParameterTypes(path.node.params, path.scope, oldTypeMap, newTypeMap);
+      },
+      FunctionDeclaration: (path: any) => {
+        this.updateParameterTypes(path.node.params, path.scope, oldTypeMap, newTypeMap);
+      }
+    });
+
     return newTypeMap;
+  }
+
+  /**
+   * Update parameter types using scope-aware binding lookup
+   */
+  private updateParameterTypes(params: any[], scope: any, oldTypeMap: TypeMap, newTypeMap: TypeMap): void {
+    for (const param of params) {
+      if (t.isIdentifier(param)) {
+        const currentName = param.name;
+        const binding = scope.getBinding(currentName);
+
+        if (binding && binding.identifier) {
+          const originalName = (binding.identifier as any)._originalName || currentName;
+
+          if (originalName !== currentName) {
+            const typeInfo = oldTypeMap.get(originalName);
+            if (typeInfo) {
+              // Update the mapping for this specific renamed parameter
+              newTypeMap.set(currentName, typeInfo);
+            }
+          }
+        }
+      }
+    }
   }
 
 }
