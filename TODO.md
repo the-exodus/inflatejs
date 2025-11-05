@@ -129,18 +129,128 @@ const race = Promise.race([p1, p2]);
 
 #### 4. Nullish Coalescing Enhancement
 **Impact**: Low-Medium (ES2020 feature)
-**Effort**: Low (10 minutes)
+**Effort**: Low-Medium (20-30 minutes for union type filtering)
 
 **Note**: Nullish coalescing (`??`) already works via logical expression support (item #4 in DONE.md). This item is for potential enhancements or edge cases.
 
+**Main Enhancement Opportunity**: Union type filtering - when creating union types for `??`, filter out `null` and `undefined` from the left side since those are the values `??` replaces.
+
+**Important**: This is NOT the same as Type Narrowing (item #9). This is simpler - just proper union type construction for the `??` operator, not control flow analysis.
+
 **Examples for verification:**
+
 ```javascript
+// Basic cases (already work)
 const value = input ?? "default";
-// Expected: value matches input type or fallback type
+// Current: value matches input type or fallback type
+// Expected: same (works correctly)
 
 const port = process.env.PORT ?? 3000;
-// Expected: port: string | number (union type)
+// Current: port: string | number (union type)
+// Expected: same (works correctly)
+
+// UNION TYPE FILTERING - Main enhancement needed
+// When left side has null/undefined in union, they should be filtered out
+// because ?? replaces those values with the right side
+const maybeString = getValue(); // returns string | null
+const definiteString = maybeString ?? "fallback";
+// Current: definiteString: string | null | string (not simplified)
+// Expected: definiteString: string (null filtered out because ?? replaces it)
+
+const optional = findUser(); // returns User | undefined
+const user = optional ?? getDefaultUser(); // returns User
+// Current: user: User | undefined | User
+// Expected: user: User (undefined filtered out)
+
+const nullable = parseValue(); // returns number | null | undefined
+const value = nullable ?? 0;
+// Current: value: number | null | undefined | number
+// Expected: value: number (both null and undefined filtered out)
+
+// Chained nullish coalescing
+const result = first ?? second ?? third ?? "default";
+// Expected: Type should filter null/undefined at each step
+// If first: string | null, second: number | undefined, third: boolean | null
+// Result should be: string | number | boolean | string → simplified appropriately
+
+// With optional chaining (combined operators)
+const name = user?.profile?.name ?? "Anonymous";
+// Current: Likely works, but verify type is correct
+// Expected: name: string (optional chaining adds undefined, ?? removes it)
+
+const length = array?.length ?? 0;
+// Expected: length: number
+
+// With array methods that return T | undefined
+const numbers = [1, 2, 3];
+const found = numbers.find(n => n > 5) ?? -1;
+// Current: found: number | undefined | number
+// Expected: found: number (undefined removed by ??)
+
+const first = array.find(x => x.active) ?? getDefault();
+// Expected: Type should be element type without undefined
+
+// Nullish coalescing assignment operator (??=)
+// This is a separate operator that may not be implemented yet
+let config = null;
+config ??= { default: true };
+// Expected: config: object
+
+let count = undefined;
+count ??= 0;
+// Expected: count: number
+
+let value = 42;
+value ??= 100;  // Doesn't assign because value is not nullish
+// Expected: value: number (unchanged)
+
+// Complex union types
+const mixed = getMixed(); // returns string | number | null
+const result = mixed ?? false;
+// Current: result: string | number | null | boolean
+// Expected: result: string | number | boolean (null removed)
+
+// In function returns
+function getValueOrDefault(input) {
+  return input ?? "default";
+}
+// Expected: If input type known with null/undefined, return type should filter them out
+
+// Nested expressions
+const result = (a ?? b) ?? (c ?? d);
+// Expected: Proper type filtering through nested expressions
+
+// Note: Type propagation (where filtered types flow through subsequent statements)
+// would require control flow analysis and is part of Type Narrowing (item #9).
+// This enhancement is just about the ?? operator itself creating correct union types.
+
+// With object/array spread
+const config = { ...defaults, ...userConfig ?? {} };
+// Expected: Verify nullish coalescing works with spread
+
+// Comparison with || operator (different behavior)
+const withOr = "" || "default";        // Returns "default" (empty string is falsy)
+const withNullish = "" ?? "default";   // Returns "" (empty string is not nullish)
+// Expected: Different types based on whether empty strings are considered
+// Current || might incorrectly type this the same as ??
+
+const withOrNum = 0 || 42;             // Returns 42 (0 is falsy)
+const withNullishNum = 0 ?? 42;        // Returns 0 (0 is not nullish)
+// Expected: These should potentially have different type behaviors
 ```
+
+**Implementation approach**:
+1. In `inferLogicalExpressionType` for `??` operator specifically
+2. When left operand has union type, filter out `null` and `undefined` types from the union
+3. Create union of filtered left type with right type
+4. Simplify the resulting union (deduplicate, etc.)
+
+**Example logic**:
+- Left: `string | null` + Right: `string` → Result: `string` (null filtered, then deduplicated)
+- Left: `number | undefined` + Right: `number` → Result: `number` (undefined filtered, then deduplicated)
+- Left: `string | null` + Right: `number` → Result: `string | number` (null filtered)
+
+**This enhancement would improve type accuracy for modern JavaScript patterns without requiring complex control flow analysis.**
 
 ---
 
