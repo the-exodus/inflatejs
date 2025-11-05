@@ -222,13 +222,14 @@ const repeated = "x".repeat(3);
   - Example: `const {name} = user;` → `name` gets `any`, should get `string`
   - This is a separate feature requiring additional type flow analysis
 
-**Tests Created**: 42 total (31 feature + 6 TypeScript compilation + 5 confidence score)
-**Tests Passing**: 36/42 ✅
+**Tests Created**: 42 total (31 feature + 10 TypeScript compilation + 5 confidence score)
+  - Note: Originally had 6 compilation tests, added 4 more that were skipped pending #7b/#7c
+**Tests Passing**: 45/46 ✅
   - 31 feature tests (all patterns, edge cases, realistic scenarios)
-  - 5 TypeScript compilation tests
-**Tests Skipped**: 6/42 (blocked on item #7c - destructured variable type propagation)
-  - 1 TypeScript compilation test
+  - 9 TypeScript compilation tests
   - 5 confidence score tests
+**Tests Skipped**: 1/46 (blocked on AST transformation limitation)
+  - 1 TypeScript compilation test (destructuring with default values - default values lost during transformation)
 
 Object and array destructuring in variable declarations and function parameters.
 
@@ -350,9 +351,11 @@ const arr = [1, 2, 3];
 const [first, ...rest] = arr;             // first: number, rest: number[] ✅
 ```
 
-**Tests Re-enabled**: 5 previously skipped tests
+**Tests Re-enabled**: 8 previously skipped tests
 - All 5 confidence score tests now passing (destructured vars have proper types with high confidence)
-- Total test count: **710 passing, 4 skipped** (only TypeScript compilation by design)
+- 3 TypeScript compilation tests now passing (object destructuring, nested destructuring, rest elements)
+- Total test count: **713 passing, 1 skipped**
+  - Only 1 test skipped: destructuring with default values (blocked on preserving defaults during AST transformation)
 
 ### 8. Spread Operator ✅ COMPLETED
 **Impact**: Medium (common in modern code)
@@ -1250,14 +1253,14 @@ For each TODO item:
   - Implemented object literal shape type inference in TypeCollector
   - Updated 14 existing tests to expect specific shapes instead of generic `object`
 - Item 7c (Destructured Variable Type Propagation): Simple one-line fix ✅
-  - Re-enabled 5 previously skipped confidence score tests, all now passing
+  - Re-enabled 8 previously skipped tests (5 confidence + 3 compilation), all now passing
   - Destructured variables now inherit types from their source objects/arrays
 - Item 15 (Destructuring): All 42 tests passing ✅
   - 31 feature tests (parameter + variable declaration destructuring)
-  - 6 TypeScript compilation tests
+  - 9 TypeScript compilation tests (3 newly re-enabled!)
   - 5 confidence score tests
-- **Total test count: 714 (710 passing, 4 skipped)**
-  - Only 4 TypeScript compilation tests skipped by design
+- **Total test count: 714 (713 passing, 1 skipped)**
+  - Only 1 test skipped: destructuring with default values (blocked on AST transformation limitation)
 - **Phase 4: 4 of 6 items complete** (Class features ✅, Destructuring ✅, Object Literal Shape Types ✅, Destructured Variable Type Propagation ✅)
 
 ### Phase 4 (6-7+ hours): Advanced Features

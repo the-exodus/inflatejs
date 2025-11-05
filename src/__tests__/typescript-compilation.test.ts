@@ -372,11 +372,10 @@ describe('TypeScript Compilation Tests', () => {
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
 
-    it.skip('should compile object destructuring', async () => {
-      // TODO: Skipped until object literal types are properly inferred (Phase 5: Inline Object/Array Types)
-      // Currently object literals are typed as 'object' instead of '{ name: string, age: number }'
-      // which causes TypeScript compilation errors when destructuring
-      const code = 'const user={name:"John",age:30};const {name,age}=user;';
+    it('should compile object destructuring', async () => {
+      // Object literal shape types (item #7b) and destructured variable type propagation (item #7c) now complete!
+      // Avoid 'name' variable as it conflicts with global window.name in TypeScript
+      const code = 'const user={firstName:"John",age:30};const {firstName,age}=user;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       const diagnostics = compileTypeScript(result);
@@ -391,9 +390,10 @@ describe('TypeScript Compilation Tests', () => {
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
 
-    it.skip('should compile nested destructuring', async () => {
-      // TODO: Skipped until object literal types are properly inferred (Phase 5: Inline Object/Array Types)
-      const code = 'const data={user:{name:"John",coords:[10,20]}};const {user:{name,coords:[x,y]}}=data;';
+    it('should compile nested destructuring', async () => {
+      // Object literal shape types (item #7b) and destructured variable type propagation (item #7c) now complete!
+      // Avoid 'name' variable as it conflicts with global window.name in TypeScript
+      const code = 'const data={user:{firstName:"John",coords:[10,20]}};const {user:{firstName,coords:[x,y]}}=data;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       const diagnostics = compileTypeScript(result);
@@ -409,8 +409,11 @@ describe('TypeScript Compilation Tests', () => {
     });
 
     it.skip('should compile destructuring with default values', async () => {
-      // TODO: Skipped until object literal types are properly inferred (Phase 5: Inline Object/Array Types)
-      // and default values are preserved in destructuring patterns
+      // TODO: Blocked on preserving default values in destructuring patterns
+      // Currently default values are lost during AST transformation (shorthand expansion)
+      // Example: {x, y = 2} becomes {x: x, y: y}, losing the = 2 default
+      // This causes TypeScript error: "Property 'y' does not exist on type '{ x: number }'"
+      // See TODO.md item #7 Known Issues
       const code = 'const obj={x:1};const {x,y=2}=obj;const arr=[1];const [a,b=2]=arr;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
@@ -418,8 +421,8 @@ describe('TypeScript Compilation Tests', () => {
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
 
-    it.skip('should compile destructuring with rest elements', async () => {
-      // TODO: Skipped until object literal types are properly inferred (Phase 5: Inline Object/Array Types)
+    it('should compile destructuring with rest elements', async () => {
+      // Object literal shape types (item #7b) and destructured variable type propagation (item #7c) now complete!
       const code = 'const obj={a:1,b:2,c:3};const {a,...rest}=obj;const arr=[1,2,3];const [first,...others]=arr;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
