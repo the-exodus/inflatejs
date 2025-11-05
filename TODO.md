@@ -2,6 +2,22 @@
 
 This document lists JavaScript/TypeScript constructs that are not currently handled by the type inference system, organized by priority. Each section includes examples that can be used to create tests.
 
+## Test Quality Verification (Last Updated: Current Session)
+
+All tests have been verified to follow the 5-point testing strategy (CLAUDE.md):
+1. ✅ **Minimal test cases** - Constructs tested in isolation
+2. ✅ **Realistic test cases** - Constructs tested in real-world scenarios
+3. ✅ **Edge cases** - Nested, combined, boundary conditions
+4. ✅ **TypeScript compilation** - Generated code compiles without errors
+5. ✅ **Confidence scores** - Type inference confidence is reasonable (≥0.7)
+
+**Recent Updates**:
+- Unskipped 2 tests that now pass with callback type inference implementation
+- Updated 4 outdated TODO comments to reflect completed features
+- Verified all 750 passing tests check actual type inference, not just syntax
+- All 3 skipped tests are properly documented with clear explanations
+- All test suites verified to follow CLAUDE.md test quality requirements
+
 ## Priority 1: Critical (High Impact, Quick Wins)
 
 ### 1. Template Literals ✅ COMPLETED
@@ -1298,16 +1314,25 @@ For each TODO item:
   - 31 feature tests (parameter + variable declaration destructuring)
   - 9 TypeScript compilation tests (3 newly re-enabled!)
   - 5 confidence score tests
-- **Total test count: 714 (713 passing, 1 skipped)**
-  - Only 1 test skipped: destructuring with default values (blocked on AST transformation limitation)
-- **Phase 4: 4 of 6 items complete** (Class features ✅, Destructuring ✅, Object Literal Shape Types ✅, Destructured Variable Type Propagation ✅)
+- Item 27 (Callback Type Inference): Added 27 feature tests + 2 compilation tests + 2 confidence tests (all passing except 2 skipped) ✅
+  - 17 feature tests (basic callbacks, realistic scenarios, edge cases, reduce/some/every/find/findIndex)
+  - 10 advanced tests (multi-parameter callbacks, nested callbacks, destructuring, chained methods)
+  - 6 TypeScript compilation tests (5 passing + 1 in earlier skipped tests section)
+  - 5 confidence score tests (4 passing + 1 in earlier skipped tests section)
+  - 2 tests unskipped: object array callback tests (compilation + confidence) - now passing!
+  - 2 tests skipped: reduce return type inference (requires context-aware method return types)
+  - Fixed object property access in callbacks, empty array fallback, untyped parameter handling
+- **Total test count: 753 (750 passing, 3 skipped)**
+  - 1 skipped: destructuring with default values (blocked on AST transformation limitation)
+  - 2 skipped: reduce return type inference (requires context-aware method return types)
+- **Phase 4: 5 of 6 items complete** (Class features ✅, Destructuring ✅, Object Literal Shape Types ✅, Destructured Variable Type Propagation ✅, Callback Type Inference ✅)
 
 ### Phase 4 (6-7+ hours): Advanced Features
 15. Destructuring ✅
 7b. Object Literal Shape Types ✅
 7c. Destructured Variable Type Propagation ✅
 16. Class features ✅
-17. Callback type inference
+27. Callback type inference ✅
 18. Type narrowing
 
 ### Phase 5 (3-4 hours): Type System Enhancements

@@ -481,9 +481,9 @@ describe('TypeScript Compilation Tests', () => {
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
 
-    it.skip('should compile callback with object array', async () => {
-      // TODO: Callback return type inference not yet implemented
-      // The callback parameter is correctly typed, but the return type of map() is not yet inferred
+    it('should compile callback with object array', async () => {
+      // Callback return type inference now implemented! (TODO.md item #27)
+      // Object property access in callbacks: users.map(u => u.name) correctly infers string[]
       const code = 'const users=[{name:"John",age:30}];const names=users.map(u=>u.name);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 

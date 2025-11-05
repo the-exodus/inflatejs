@@ -186,10 +186,11 @@ describe('Chained Method Calls', () => {
       const code = 'const csv="name,age\\nJohn,30\\nJane,25";const rows=csv.split("\\n").slice(1).map(row=>row.split(","));';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // TODO: Callback return type inference not yet implemented (item 27 in TODO.md)
-      // Nested split() in callback returns string[] but we currently preserve the array element type
-      // Expected: string[][] (array of arrays), Current: string[]
-      // This is expected behavior until callback return type inference is implemented
+      // Callback return type inference is implemented, but nested array inference is not
+      // The callback row=>row.split(",") returns string[], so rows should be string[][]
+      // However, current implementation doesn't infer array returns from method calls in callbacks
+      // This would require recursive type inference through nested method calls
+      // Current behavior: preserves array element type (string[])
       expect(result).toMatch(/rows:\s*string\[\]/);
     });
 

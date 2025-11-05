@@ -626,7 +626,7 @@ describe('Confidence Score Validation', () => {
       const typeMap = collector.collectTypes(ast);
 
       // Callback parameter 'x' should be inferred as number with high confidence
-      // TODO: This will work once callback inference is implemented
+      // Callback inference now implemented! (TODO.md item #27)
       const paramType = typeMap.get('x');
       if (paramType) {
         expect(paramType.typeName).toBe('number');
@@ -684,9 +684,9 @@ describe('Confidence Score Validation', () => {
       }
     });
 
-    it.skip('should assign high confidence to callback with object array', () => {
-      // TODO: Object literal shape type propagation to callbacks not fully working yet
-      // The parameter is being inferred but the properties field isn't being preserved correctly
+    it('should assign high confidence to callback with object array', () => {
+      // Object literal shape type propagation to callbacks now working! (TODO.md item #27)
+      // The properties field is preserved through array type creation and callback context extraction
       const code = 'const users = [{ name: "John", age: 30 }]; users.map(u => u.name);';
       const ast = parse(code, { sourceType: 'module' });
       const collector = new TypeCollector();
