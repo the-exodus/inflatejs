@@ -54,10 +54,10 @@ describe('Destructuring', () => {
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       // Object should have shape type
-      // TODO: Default values in destructuring are currently lost during shorthand expansion
+      // Default values are now preserved!
       expect(result).toMatch(/obj:\s*\{\s*x:\s*number\s*\}/);
       expect(result).toContain('x: x');
-      expect(result).toContain('y: y'); // Default value currently lost
+      expect(result).toContain('y = 2'); // Default value preserved
     });
 
     it('should handle object destructuring with rest properties', async () => {
@@ -189,10 +189,9 @@ describe('Destructuring', () => {
       const code = 'function greet({name="Guest",age=0}={}){return name;}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Note: Default values in destructuring are currently lost during AST transformation
-      // Pattern preserves the structure but defaults are removed
-      expect(result).toContain('name: name');
-      expect(result).toContain('age: age');
+      // Default values are now preserved!
+      expect(result).toContain('name = "Guest"');
+      expect(result).toContain('age = 0');
       expect(result).toContain('= {}'); // Default value for the parameter itself
       expect(result).toContain('string'); // Return type
     });

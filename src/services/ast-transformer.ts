@@ -134,7 +134,13 @@ export class ASTTransformer implements IASTTransformer {
       ObjectProperty: (path) => {
         if (path.node.shorthand && t.isIdentifier(path.node.key)) {
           path.node.shorthand = false;
-          path.node.value = t.identifier(path.node.key.name);
+
+          // Only replace value if it's a plain identifier
+          // Preserve AssignmentPattern (default values like {x = 5})
+          if (t.isIdentifier(path.node.value)) {
+            path.node.value = t.identifier(path.node.key.name);
+          }
+          // If value is AssignmentPattern, leave it alone - it has the default value
         }
       }
     });
