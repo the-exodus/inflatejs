@@ -53,9 +53,9 @@ describe('Destructuring', () => {
       const code = 'const obj={x:1};const {x,y=2}=obj;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Object should have shape type
-      // Default values are now preserved!
-      expect(result).toMatch(/obj:\s*\{\s*x:\s*number\s*\}/);
+      // Object should have shape type with optional property for destructured default
+      // Default values are now preserved, and missing properties are added as optional!
+      expect(result).toMatch(/obj:\s*\{\s*x:\s*number\s*,\s*y\?:\s*number\s*\}/);
       expect(result).toContain('x: x');
       expect(result).toContain('y = 2'); // Default value preserved
     });

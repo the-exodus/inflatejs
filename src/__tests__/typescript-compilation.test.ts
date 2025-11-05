@@ -408,14 +408,10 @@ describe('TypeScript Compilation Tests', () => {
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
 
-    it.skip('should compile destructuring with default values', async () => {
-      // TODO: TypeScript type system limitation
-      // Default values ARE preserved (y = 2), but TypeScript complains:
-      // "Property 'y' does not exist on type '{ x: number }'"
-      // This is correct TS behavior - obj is typed as { x: number }, so destructuring { y = 2 }
-      // is technically accessing a non-existent property (even with a default).
-      // Solutions: 1) Don't add type annotations when defaults present, 2) Make properties optional
-      // This is a design decision about how strict we want type annotations to be.
+    it('should compile destructuring with default values', async () => {
+      // Fixed! Properties destructured with defaults are now added as optional properties
+      // obj is typed as { x: number, y?: number }, so destructuring { y = 2 } is valid
+      // This allows TypeScript compilation while preserving type safety
       const code = 'const obj={x:1};const {x,y=2}=obj;const arr=[1];const [a,b=2]=arr;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 

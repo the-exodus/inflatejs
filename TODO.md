@@ -12,11 +12,11 @@ All tests have been verified to follow the 5-point testing strategy (CLAUDE.md):
 5. ✅ **Confidence scores** - Type inference confidence is reasonable (≥0.7)
 
 **Recent Updates**:
-- Unskipped 2 tests that now pass with callback type inference implementation
+- Unskipped 3 tests that now pass (2 callback inference + 1 destructuring with defaults)
+- **Implemented optional property inference**: Object literals destructured with default values for missing properties now get those properties added as optional (e.g., `{ x: number, y?: number }`)
 - Updated 4 outdated TODO comments to reflect completed features
-- Verified all 750 passing tests check actual type inference, not just syntax
-- All 3 skipped tests are properly documented with clear explanations
-- Clarified destructuring with default values: **feature fully works**, compilation test skipped due to TypeScript type system limitation
+- Verified all 751 passing tests check actual type inference, not just syntax
+- All 2 skipped tests are properly documented with clear explanations (both reduce return type inference)
 - All test suites verified to follow CLAUDE.md test quality requirements
 
 ## Priority 1: Critical (High Impact, Quick Wins)
@@ -231,22 +231,24 @@ const repeated = "x".repeat(3);
 - Array destructuring preserves array element types in pattern
 - Nested patterns work recursively
 - Default values preserved in output ✅
+- **Optional property inference**: Object literals destructured with default values for missing properties automatically get those properties added as optional ✅
+  - Example: `const obj = {x: 1}; const {x, y = 2} = obj;` → `obj: { x: number, y?: number }`
+  - This allows TypeScript compilation while preserving type safety
 - Rest elements handled correctly
 
 **Known Limitations**:
-- Destructured variable type propagation not yet implemented (item #7c - follow-up feature)
-  - Variables get `any` type instead of inheriting from source
-  - Example: `const {name} = user;` → `name` gets `any`, should get `string`
-  - This is a separate feature requiring additional type flow analysis
+- ~~Destructured variable type propagation not yet implemented (item #7c - follow-up feature)~~ ✅ FIXED
+  - ~~Variables get `any` type instead of inheriting from source~~
+  - ~~Example: `const {name} = user;` → `name` gets `any`, should get `string`~~
+  - ~~This is a separate feature requiring additional type flow analysis~~
 
 **Tests Created**: 42 total (31 feature + 10 TypeScript compilation + 5 confidence score)
   - Note: Originally had 6 compilation tests, added 4 more that were skipped pending #7b/#7c
-**Tests Passing**: 45/46 ✅
+**Tests Passing**: 46/46 ✅ (ALL PASSING!)
   - 31 feature tests (all patterns, edge cases, realistic scenarios)
-  - 9 TypeScript compilation tests
+  - 10 TypeScript compilation tests (1 previously skipped now passing!)
   - 5 confidence score tests
-**Tests Skipped**: 1/46 (TypeScript type system design limitation)
-  - 1 TypeScript compilation test (destructuring with default values - feature works but TS complains about accessing non-existent property)
+**Tests Skipped**: 0/46 ✅ (None! All tests passing!)
 
 Object and array destructuring in variable declarations and function parameters.
 
@@ -1323,8 +1325,7 @@ For each TODO item:
   - 2 tests unskipped: object array callback tests (compilation + confidence) - now passing!
   - 2 tests skipped: reduce return type inference (requires context-aware method return types)
   - Fixed object property access in callbacks, empty array fallback, untyped parameter handling
-- **Total test count: 753 (750 passing, 3 skipped)**
-  - 1 skipped: destructuring with default values **TypeScript compilation only** (feature works, TS type system limitation)
+- **Total test count: 753 (751 passing, 2 skipped)**
   - 2 skipped: reduce return type inference (requires context-aware method return types)
 - **Phase 4: 5 of 6 items complete** (Class features ✅, Destructuring ✅, Object Literal Shape Types ✅, Destructured Variable Type Propagation ✅, Callback Type Inference ✅)
 

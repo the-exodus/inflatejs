@@ -310,7 +310,18 @@ export class UnminificationPipeline implements IUnminificationPipeline {
           // we're at 0.729, and after array transformation callbacks we can be around 0.6-0.65
           // Skip 'void' type as it's usually inaccurate for variables (indicates missing return type inference)
           if (varType && varType.confidence >= 0.5 && varType.typeName !== 'any' && varType.typeName !== 'void') {
-            path.node.id.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(varType.typeName);
+            let typeAnnotation = varType.typeName;
+
+            // Special handling for object literal types: check if they're destructured with
+            // additional properties with default values, and make those properties optional
+            if (t.isObjectExpression(path.node.init) && varType.typeName.match(/^\{\s*.+\s*\}$/)) {
+              const optionalProps = this.findOptionalPropsForDestructuring(ast, varName, varType);
+              if (optionalProps.length > 0) {
+                typeAnnotation = this.addOptionalPropertiesToType(varType.typeName, optionalProps);
+              }
+            }
+
+            path.node.id.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(typeAnnotation);
           }
         }
         // Note: We intentionally don't add pattern type annotations to variable declarators
@@ -610,6 +621,82 @@ export class UnminificationPipeline implements IUnminificationPipeline {
         }
       }
     }
+  }
+
+  /**
+   * Find properties that are destructured with default values but don't exist in the object type
+   * This helps make TypeScript compilation work by adding them as optional properties
+   */
+  private findOptionalPropsForDestructuring(ast: any, varName: string, varType: any): Array<{name: string, type: string}> {
+    const optionalProps: Array<{name: string, type: string}> = [];
+
+    // Parse existing properties from the object type
+    const existingProps = new Set<string>();
+    if (varType.properties) {
+      Object.keys(varType.properties).forEach(key => existingProps.add(key));
+    }
+
+    // Scan AST for destructuring patterns that use this variable
+    traverse(ast, {
+      VariableDeclarator: (path: any) => {
+        // Check if the init (right side) references our variable
+        if (t.isIdentifier(path.node.init) && path.node.init.name === varName) {
+          // Check if the id (left side) is an object pattern (destructuring)
+          if (t.isObjectPattern(path.node.id)) {
+            // Check each property in the pattern
+            path.node.id.properties.forEach((prop: any) => {
+              if (t.isObjectProperty(prop) && t.isAssignmentPattern(prop.value)) {
+                // This property has a default value
+                const propName = t.isIdentifier(prop.key) ? prop.key.name : null;
+                if (propName && !existingProps.has(propName)) {
+                  // Property doesn't exist in the object, infer type from default value
+                  const defaultValue = prop.value.right;
+                  let inferredType = 'any';
+
+                  if (t.isNumericLiteral(defaultValue)) {
+                    inferredType = 'number';
+                  } else if (t.isStringLiteral(defaultValue)) {
+                    inferredType = 'string';
+                  } else if (t.isBooleanLiteral(defaultValue)) {
+                    inferredType = 'boolean';
+                  } else if (t.isNullLiteral(defaultValue)) {
+                    inferredType = 'null';
+                  } else if (t.isArrayExpression(defaultValue)) {
+                    inferredType = 'any[]';
+                  } else if (t.isObjectExpression(defaultValue)) {
+                    inferredType = 'object';
+                  }
+
+                  optionalProps.push({ name: propName, type: inferredType });
+                }
+              }
+            });
+          }
+        }
+      },
+      noScope: true
+    });
+
+    return optionalProps;
+  }
+
+  /**
+   * Add optional properties to an object type string
+   * Example: "{ x: number }" + [{name: "y", type: "number"}] => "{ x: number, y?: number }"
+   */
+  private addOptionalPropertiesToType(typeStr: string, optionalProps: Array<{name: string, type: string}>): string {
+    // Remove the closing brace
+    const withoutClosing = typeStr.trim().replace(/\}$/, '').trim();
+
+    // Add comma if there are existing properties
+    const separator = withoutClosing.endsWith('{') ? '' : ', ';
+
+    // Build optional property strings
+    const optionalPropsStr = optionalProps
+      .map(prop => `${prop.name}?: ${prop.type}`)
+      .join(', ');
+
+    return `${withoutClosing}${separator}${optionalPropsStr} }`;
   }
 
 }
