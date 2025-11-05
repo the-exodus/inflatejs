@@ -219,10 +219,17 @@ export class UnminificationPipeline implements IUnminificationPipeline {
 
       // Add type annotations to arrow functions
       ArrowFunctionExpression: (path: any) => {
-        // Add 'any' type to parameters without type annotations
+        // Add type annotations to parameters
         path.node.params.forEach((param: any) => {
           if (t.isIdentifier(param) && !param.typeAnnotation) {
-            param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            // Check if we have an inferred type for this parameter
+            const paramType = typeMap.get(param.name);
+            if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any') {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+            } else {
+              // Default to 'any' if no inferred type
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            }
           } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
             // Handle default parameters - check the typeMap for inferred type
             const paramName = param.left.name;
@@ -253,10 +260,17 @@ export class UnminificationPipeline implements IUnminificationPipeline {
 
       // Add type annotations to function expressions
       FunctionExpression: (path: any) => {
-        // Add 'any' type to parameters without type annotations
+        // Add type annotations to parameters
         path.node.params.forEach((param: any) => {
           if (t.isIdentifier(param) && !param.typeAnnotation) {
-            param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            // Check if we have an inferred type for this parameter
+            const paramType = typeMap.get(param.name);
+            if (paramType && paramType.confidence >= 0.7 && paramType.typeName !== 'any') {
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation(paramType.typeName);
+            } else {
+              // Default to 'any' if no inferred type
+              param.typeAnnotation = this.tsTypeBuilder.createTypeAnnotation('any');
+            }
           } else if (t.isAssignmentPattern(param) && t.isIdentifier(param.left)) {
             // Handle default parameters - check the typeMap for inferred type
             const paramName = param.left.name;

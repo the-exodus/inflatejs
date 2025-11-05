@@ -431,5 +431,64 @@ describe('TypeScript Compilation Tests', () => {
       const diagnostics = compileTypeScript(result);
       expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
     });
+
+    // Callback Type Inference Tests (TODO.md item #27)
+    it('should compile map callback with number array', async () => {
+      const code = 'const numbers=[1,2,3];const doubled=numbers.map(x=>x*2);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile filter callback with string array', async () => {
+      const code = 'const words=["hello","world","test"];const long=words.filter(w=>w.length>4);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile chained array methods', async () => {
+      const code = 'const numbers=[1,2,3,4,5];const result=numbers.filter(n=>n>2).map(n=>n*2);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile reduce callback', async () => {
+      const code = 'const numbers=[1,2,3];const sum=numbers.reduce((acc,n)=>acc+n,0);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile forEach callback', async () => {
+      const code = 'const numbers=[1,2,3];numbers.forEach(n=>console.log(n));';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it('should compile find callback', async () => {
+      const code = 'const numbers=[1,2,3,4,5];const found=numbers.find(n=>n>3);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
+
+    it.skip('should compile callback with object array', async () => {
+      // TODO: Callback return type inference not yet implemented
+      // The callback parameter is correctly typed, but the return type of map() is not yet inferred
+      const code = 'const users=[{name:"John",age:30}];const names=users.map(u=>u.name);';
+      const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
+
+      const diagnostics = compileTypeScript(result);
+      expect(diagnostics.length, `Compilation errors:\n${formatDiagnostics(diagnostics)}`).toBe(0);
+    });
   });
 });

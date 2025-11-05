@@ -242,7 +242,9 @@ export class TypeCollector implements ITypeCollector {
    * Handle function expressions
    */
   private handleFunctionExpression(path: NodePath<t.FunctionExpression>, typeMap: TypeMap): void {
-    this.handleFunctionParameters(path.node.params, typeMap);
+    // Check if this is a callback to an array method and infer parameter types
+    const callbackContext = this.inferCallbackContext(path, typeMap);
+    this.handleFunctionParameters(path.node.params, typeMap, callbackContext);
   }
 
   /**
@@ -252,16 +254,38 @@ export class TypeCollector implements ITypeCollector {
     path: NodePath<t.ArrowFunctionExpression>,
     typeMap: TypeMap
   ): void {
-    this.handleFunctionParameters(path.node.params, typeMap);
+    // Check if this is a callback to an array method and infer parameter types
+    const callbackContext = this.inferCallbackContext(path, typeMap);
+    this.handleFunctionParameters(path.node.params, typeMap, callbackContext);
   }
 
   /**
    * Handle function parameters (including destructuring)
+   * @param params - Function parameters
+   * @param typeMap - Type map to update
+   * @param callbackContext - Optional callback context with array element type and method name
    */
-  private handleFunctionParameters(params: Array<t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty>, typeMap: TypeMap): void {
-    params.forEach(param => {
+  private handleFunctionParameters(
+    params: Array<t.Identifier | t.Pattern | t.RestElement | t.TSParameterProperty>,
+    typeMap: TypeMap,
+    callbackContext?: { elementType: InferredType; methodName: string; initialValueType?: InferredType } | null
+  ): void {
+    params.forEach((param, index) => {
       if (t.isIdentifier(param)) {
-        typeMap.set(param.name, { typeName: 'any', confidence: 0 });
+        // Default to any
+        let paramType: InferredType = { typeName: 'any', confidence: 0 };
+
+        // If this is a callback, infer parameter type from context
+        if (callbackContext) {
+          paramType = this.inferCallbackParameterType(
+            index,
+            callbackContext.elementType,
+            callbackContext.methodName,
+            callbackContext.initialValueType
+          );
+        }
+
+        typeMap.set(param.name, paramType);
       } else if (t.isAssignmentPattern(param)) {
         // Handle default parameters
         if (t.isIdentifier(param.left)) {
@@ -946,5 +970,157 @@ export class TypeCollector implements ITypeCollector {
     // Build function signature
     const typeStr = `(${paramTypes.join(', ')}) => ${returnType.typeName}`;
     return { typeName: typeStr, confidence: Math.min(0.8, returnType.confidence) };
+  }
+
+  /**
+   * Infer callback context from parent call expression
+   * Detects if a function is being used as a callback to an array method
+   * and extracts the array element type and method name
+   */
+  private inferCallbackContext(
+    path: NodePath<t.FunctionExpression | t.ArrowFunctionExpression>,
+    typeMap: TypeMap
+  ): { elementType: InferredType; methodName: string; initialValueType?: InferredType } | null {
+    const parent = path.parent;
+
+    // Check if parent is a CallExpression (e.g., arr.map(...))
+    if (!t.isCallExpression(parent)) {
+      return null;
+    }
+
+    // Check if callee is a MemberExpression (e.g., arr.map)
+    if (!t.isMemberExpression(parent.callee)) {
+      return null;
+    }
+
+    const memberExpr = parent.callee;
+    const methodName = t.isIdentifier(memberExpr.property)
+      ? memberExpr.property.name
+      : null;
+
+    // Only handle known array methods
+    const arrayMethods = ['map', 'filter', 'forEach', 'find', 'findIndex', 'some', 'every', 'reduce', 'reduceRight'];
+    if (!methodName || !arrayMethods.includes(methodName)) {
+      return null;
+    }
+
+    // Get the array type
+    let arrayType: InferredType | null = null;
+
+    if (t.isIdentifier(memberExpr.object)) {
+      // Simple case: arr.map(...)
+      arrayType = typeMap.get(memberExpr.object.name) || null;
+    } else if (t.isCallExpression(memberExpr.object) && t.isMemberExpression(memberExpr.object.callee)) {
+      // Chained case: arr.filter(...).map(...)
+      // Try to infer from the previous method's return type
+      const prevMethod = t.isIdentifier(memberExpr.object.callee.property)
+        ? memberExpr.object.callee.property.name
+        : null;
+
+      if (prevMethod && (prevMethod === 'filter' || prevMethod === 'map')) {
+        // These methods preserve or transform the array type
+        // Try to get the base array type from the chained expression
+        if (t.isIdentifier(memberExpr.object.callee.object)) {
+          const baseArrayType = typeMap.get(memberExpr.object.callee.object.name);
+          if (baseArrayType) {
+            arrayType = baseArrayType;
+          }
+        }
+      }
+    }
+
+    // Extract element type from array type
+    if (!arrayType || !arrayType.typeName) {
+      return null;
+    }
+
+    const arrayTypeName = arrayType.typeName;
+    let elementType: InferredType;
+
+    if (arrayTypeName.endsWith('[]')) {
+      // Standard array notation: number[], string[], etc.
+      const baseType = arrayTypeName.slice(0, -2);
+      elementType = { typeName: baseType, confidence: arrayType.confidence };
+    } else if (arrayTypeName.match(/^\{\s*.+\s*\}\[\]$/)) {
+      // Object literal shape array: { name: string, age: number }[]
+      const objectType = arrayTypeName.slice(0, -2);
+      elementType = {
+        typeName: objectType,
+        confidence: arrayType.confidence,
+        properties: arrayType.properties
+      };
+    } else {
+      // Unknown array type format
+      return null;
+    }
+
+    // For reduce/reduceRight, get initial value type
+    let initialValueType: InferredType | undefined;
+    if ((methodName === 'reduce' || methodName === 'reduceRight') && parent.arguments.length >= 2) {
+      initialValueType = this.inferTypeFromNode(parent.arguments[1]) || undefined;
+    }
+
+    return { elementType, methodName, initialValueType };
+  }
+
+  /**
+   * Infer callback parameter type based on position and context
+   * @param paramIndex - Parameter index (0-based)
+   * @param elementType - Array element type
+   * @param methodName - Array method name (map, filter, reduce, etc.)
+   * @param initialValueType - Initial value type for reduce
+   */
+  private inferCallbackParameterType(
+    paramIndex: number,
+    elementType: InferredType,
+    methodName: string,
+    initialValueType?: InferredType
+  ): InferredType {
+    // Parameter 0: depends on method
+    if (paramIndex === 0) {
+      if (methodName === 'reduce' || methodName === 'reduceRight') {
+        // First parameter is accumulator - type comes from initial value or element type
+        return initialValueType || elementType;
+      } else {
+        // First parameter is current element
+        return elementType;
+      }
+    }
+
+    // Parameter 1: depends on method
+    if (paramIndex === 1) {
+      if (methodName === 'reduce' || methodName === 'reduceRight') {
+        // Second parameter is current element
+        return elementType;
+      } else {
+        // Second parameter is index (number)
+        return { typeName: 'number', confidence: 1.0 };
+      }
+    }
+
+    // Parameter 2: depends on method
+    if (paramIndex === 2) {
+      if (methodName === 'reduce' || methodName === 'reduceRight') {
+        // Third parameter is index (number)
+        return { typeName: 'number', confidence: 1.0 };
+      } else {
+        // Third parameter is array itself
+        const arrayType = elementType.typeName.endsWith('[]')
+          ? elementType.typeName
+          : `${elementType.typeName}[]`;
+        return { typeName: arrayType, confidence: elementType.confidence };
+      }
+    }
+
+    // Parameter 3: for reduce, this is the array
+    if (paramIndex === 3 && (methodName === 'reduce' || methodName === 'reduceRight')) {
+      const arrayType = elementType.typeName.endsWith('[]')
+        ? elementType.typeName
+        : `${elementType.typeName}[]`;
+      return { typeName: arrayType, confidence: elementType.confidence };
+    }
+
+    // Default fallback
+    return { typeName: 'any', confidence: 0 };
   }
 }
