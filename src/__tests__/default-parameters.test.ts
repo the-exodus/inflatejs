@@ -120,14 +120,16 @@ describe('Default Parameters', () => {
       const code = 'function process(opts={x:1,y:2}){return opts.x;}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toMatch(/opts:\s*object/);
+      // Now infers specific object shape instead of generic 'object'
+      expect(result).toMatch(/opts:\s*\{\s*x:\s*number\s*,\s*y:\s*number\s*\}/);
     });
 
     it('should infer object type from empty object default', async () => {
       const code = 'function merge(obj={}){return obj;}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toMatch(/obj:\s*object/);
+      // Empty object gets specific {} type instead of generic 'object'
+      expect(result).toMatch(/obj:\s*\{\s*\}/);
     });
   });
 

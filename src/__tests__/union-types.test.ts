@@ -182,7 +182,8 @@ describe('Union type inference', () => {
       const code = 'const flag=true;const result=flag?{x:1}:null;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toMatch(/result:\s*(object\s*\|\s*null|null\s*\|\s*object)/);
+      // Now infers specific object shape in union
+      expect(result).toMatch(/result:\s*(\{\s*x:\s*number\s*\}\s*\|\s*null|null\s*\|\s*\{\s*x:\s*number\s*\})/);
     });
 
     it('should create unions even when intermediate values have low confidence', async () => {

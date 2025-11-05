@@ -132,7 +132,8 @@ describe('RegExp literal type inference', () => {
       const code = 'const validators={email:/^.+@.+$/,phone:/^\\d{10}$/};';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toMatch(/validators:\s*object/);
+      // Now infers specific object shape with RegExp properties
+      expect(result).toMatch(/validators:\s*\{\s*email:\s*RegExp\s*,\s*phone:\s*RegExp\s*\}/);
     });
   });
 

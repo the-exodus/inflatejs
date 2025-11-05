@@ -58,7 +58,8 @@ describe('Spread Operator', () => {
       const code = 'const obj1={x:1,y:2};const obj2={...obj1,z:3};';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toMatch(/obj1:\s*object/);
+      // obj1 has known shape, obj2 has spread so falls back to generic object
+      expect(result).toMatch(/obj1:\s*\{\s*x:\s*number\s*,\s*y:\s*number\s*\}/);
       expect(result).toMatch(/obj2:\s*object/);
     });
 
@@ -75,6 +76,8 @@ describe('Spread Operator', () => {
       const code = 'const orig={a:1};const copy={...orig};';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
+      // orig has known shape, copy has spread so falls back to generic object
+      expect(result).toMatch(/orig:\s*\{\s*a:\s*number\s*\}/);
       expect(result).toMatch(/copy:\s*object/);
     });
 
@@ -216,6 +219,8 @@ describe('Spread Operator', () => {
       const code = 'const user={name:"John",age:30};const userCopy={...user};';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
+      // user has known shape, userCopy has spread so falls back to generic object
+      expect(result).toMatch(/user:\s*\{\s*name:\s*string\s*,\s*age:\s*number\s*\}/);
       expect(result).toMatch(/userCopy:\s*object/);
     });
 
@@ -223,6 +228,8 @@ describe('Spread Operator', () => {
       const code = 'const defaults={x:0,y:0};const config={...defaults,x:10};';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
+      // defaults has known shape, config has spread so falls back to generic object
+      expect(result).toMatch(/defaults:\s*\{\s*x:\s*number\s*,\s*y:\s*number\s*\}/);
       expect(result).toMatch(/config:\s*object/);
     });
 

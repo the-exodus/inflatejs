@@ -62,7 +62,8 @@ describe('Class Features - Type Inference', () => {
       const code = 'class Factory{create(){return{x:1,y:2};}}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      expect(result).toMatch(/create\s*\(\s*\):\s*object/);
+      // Now infers specific object shape instead of generic 'object'
+      expect(result).toMatch(/create\s*\(\s*\):\s*\{\s*x:\s*number\s*,\s*y:\s*number\s*\}/);
     });
 
     it('should handle methods that return arrays', async () => {
@@ -262,7 +263,8 @@ describe('Class Features - Type Inference', () => {
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
       expect(result).toMatch(/getArray\s*\(\s*\):\s*number\[\]/);
-      expect(result).toMatch(/getObject\s*\(\s*\):\s*object/);
+      // Now infers specific object shape instead of generic 'object'
+      expect(result).toMatch(/getObject\s*\(\s*\):\s*\{\s*x:\s*number\s*\}/);
       expect(result).toMatch(/getString\s*\(\s*\):\s*string/);
       expect(result).toMatch(/getBoolean\s*\(\s*\):\s*boolean/);
     });

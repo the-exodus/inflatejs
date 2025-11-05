@@ -2,18 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { unminify } from '../unminifier-facade';
 
 describe('Destructuring', () => {
-  // NOTE: Variable declaration destructuring tests are skipped because they require
-  // object literal shape types (TODO item #7b) to work properly. Currently object
-  // literals are typed as generic 'object', preventing TypeScript from inferring
-  // destructured variable types.
-  //
-  // Only Parameter Destructuring tests are meaningful and actively tested.
+  // NOTE: With object literal shape types now implemented (item #7b), variable declaration
+  // destructuring should work properly. TypeScript can infer types from the source object's
+  // specific shape like { name: string, age: number } instead of generic 'object'.
 
-  describe.skip('Object Destructuring - Basic', () => {
-    // TODO: Blocked on item #7b (Object Literal Shape Types)
-    // All tests in this block require object literals to have specific shape types
-    // instead of generic 'object'
-
+  describe('Object Destructuring - Basic', () => {
     it('should handle basic object destructuring from literal', async () => {
       const code = 'const user={name:"John",age:30};const {name,age}=user;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
@@ -24,10 +17,8 @@ describe('Destructuring', () => {
       const code = 'const obj={x:1,y:2};const {x,y}=obj;const sum=x+y;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify destructuring pattern and object typing
-      expect(result).toContain('obj: object');
-      expect(result).toContain('x: x');
-      expect(result).toContain('y: y');
+      // Object should have shape type, enabling destructuring
+      expect(result).toMatch(/obj:\s*\{\s*x:\s*number\s*,\s*y:\s*number\s*\}/);
       expect(result).toContain('sum'); // sum variable exists
     });
 
@@ -35,8 +26,8 @@ describe('Destructuring', () => {
       const code = 'const user={name:"John"};const {name:userName}=user;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify alias destructuring pattern is preserved
-      expect(result).toContain('user: object');
+      // Object should have shape type
+      expect(result).toMatch(/user:\s*\{\s*name:\s*string\s*\}/);
       expect(result).toContain('name: userName');
     });
 
@@ -44,32 +35,27 @@ describe('Destructuring', () => {
       const code = 'const obj={a:1,b:2,c:3};const {a,c}=obj;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify partial destructuring pattern
-      expect(result).toContain('obj: object');
-      expect(result).toContain('a: a');
-      expect(result).toContain('c: c');
+      // Object should have full shape type (all properties)
+      expect(result).toMatch(/obj:\s*\{\s*a:\s*number\s*,\s*b:\s*number\s*,\s*c:\s*number\s*\}/);
     });
   });
 
-  describe.skip('Object Destructuring - Advanced', () => {
-    // TODO: Blocked on item #7b (Object Literal Shape Types)
+  describe('Object Destructuring - Advanced', () => {
     it('should handle nested object destructuring', async () => {
       const code = 'const data={user:{name:"John",age:30}};const {user:{name,age}}=data;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify nested pattern structure is preserved
-      expect(result).toContain('user:');
-      expect(result).toContain('name');
-      expect(result).toContain('age');
+      // Nested shape type should be inferred
+      expect(result).toMatch(/data:\s*\{\s*user:\s*\{\s*name:\s*string\s*,\s*age:\s*number\s*\}\s*\}/);
     });
 
     it('should handle object destructuring with default values', async () => {
       const code = 'const obj={x:1};const {x,y=2}=obj;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify destructuring pattern exists
+      // Object should have shape type
       // TODO: Default values in destructuring are currently lost during shorthand expansion
-      expect(result).toContain('obj: object');
+      expect(result).toMatch(/obj:\s*\{\s*x:\s*number\s*\}/);
       expect(result).toContain('x: x');
       expect(result).toContain('y: y'); // Default value currently lost
     });
@@ -78,9 +64,8 @@ describe('Destructuring', () => {
       const code = 'const obj={a:1,b:2,c:3};const {a,...rest}=obj;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify destructuring with rest element
-      expect(result).toContain('obj: object');
-      expect(result).toContain('a: a');
+      // Object should have shape type
+      expect(result).toMatch(/obj:\s*\{\s*a:\s*number\s*,\s*b:\s*number\s*,\s*c:\s*number\s*\}/);
       expect(result).toContain('...rest'); // Rest element preserved
     });
 
@@ -95,13 +80,12 @@ describe('Destructuring', () => {
     });
   });
 
-  describe.skip('Array Destructuring - Basic', () => {
-    // TODO: Blocked on item #7b (Object Literal Shape Types) - same issue for arrays
+  describe('Array Destructuring - Basic', () => {
     it('should handle basic array destructuring from literal', async () => {
       const code = 'const coords=[10,20];const [x,y]=coords;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify array destructuring pattern
+      // Array type should be inferred
       expect(result).toContain('coords: number[]');
       expect(result).toContain('[x, y]');
     });
@@ -126,8 +110,7 @@ describe('Destructuring', () => {
     });
   });
 
-  describe.skip('Array Destructuring - Advanced', () => {
-    // TODO: Blocked on item #7b (Object Literal Shape Types)
+  describe('Array Destructuring - Advanced', () => {
     it('should handle nested array destructuring', async () => {
       const code = 'const matrix=[[1,2],[3,4]];const [[a,b],[c,d]]=matrix;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
@@ -234,24 +217,21 @@ describe('Destructuring', () => {
     });
   });
 
-  describe.skip('Mixed and Edge Cases', () => {
-    // TODO: Blocked on item #7b (Object Literal Shape Types)
+  describe('Mixed and Edge Cases', () => {
     it('should handle mixed object and array destructuring', async () => {
       const code = 'const data={arr:[1,2]};const {arr:[x,y]}=data;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Mixed pattern destructuring
-      expect(result).toContain('{');
-      expect(result).toContain('arr');
+      // Object should have shape type with array property
+      expect(result).toMatch(/data:\s*\{\s*arr:\s*number\[\]\s*\}/);
     });
 
     it('should handle destructuring in variable reassignment', async () => {
       const code = 'let x,y;const obj={a:1,b:2};({a:x,b:y}=obj);';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Destructuring assignment - just verify pattern structure is preserved
-      expect(result).toContain('a:');
-      expect(result).toContain('b:');
+      // Object should have shape type
+      expect(result).toMatch(/obj:\s*\{\s*a:\s*number\s*,\s*b:\s*number\s*\}/);
       expect(result).toContain('= obj');
     });
 
@@ -267,10 +247,8 @@ describe('Destructuring', () => {
       const code = 'const data={user:{name:"John",coords:[10,20]}};const {user:{name,coords:[x,y]}}=data;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify complex nested pattern structure is preserved
-      expect(result).toContain('user:');
-      expect(result).toContain('name');
-      expect(result).toContain('coords');
+      // Complex nested shape type should be inferred
+      expect(result).toMatch(/data:\s*\{\s*user:\s*\{\s*name:\s*string\s*,\s*coords:\s*number\[\]\s*\}\s*\}/);
     });
 
     it('should handle empty destructuring patterns', async () => {
@@ -284,8 +262,7 @@ describe('Destructuring', () => {
     });
   });
 
-  describe.skip('Realistic Scenarios', () => {
-    // TODO: Blocked on item #7b (Object Literal Shape Types)
+  describe('Realistic Scenarios', () => {
     it('should handle destructuring in API response processing', async () => {
       const code = 'function processUser(response){const {data:{user:{id,name,email}}}=response;return {id,name,email};}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
@@ -299,10 +276,8 @@ describe('Destructuring', () => {
       const code = 'const config={port:3000,host:"localhost"};const {port,host}=config;const url=`http://${host}:${port}`;';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Verify destructuring pattern and type propagation
-      expect(result).toContain('config: object');
-      expect(result).toContain('port: port');
-      expect(result).toContain('host: host');
+      // Config should have shape type enabling type propagation
+      expect(result).toMatch(/config:\s*\{\s*port:\s*number\s*,\s*host:\s*string\s*\}/);
       expect(result).toContain('url'); // url variable exists
     });
 
@@ -310,10 +285,9 @@ describe('Destructuring', () => {
       const code = 'function Component({title,count,onClick}){return `${title}: ${count}`;}';
       const result = await unminify(code, { inferTypes: true, outputFormat: 'ts' });
 
-      // Function parameter destructuring
-      expect(result).toContain('{');
-      expect(result).toContain('title');
-      expect(result).toContain('count');
+      // Function parameter destructuring should have pattern-level type annotation
+      expect(result).toMatch(/\{\s*title:\s*any\s*,\s*count:\s*any\s*,\s*onClick:\s*any\s*\}/);
+      expect(result).toContain('string'); // Return type
     });
 
     it('should handle destructuring in coordinate calculations', async () => {

@@ -528,11 +528,12 @@ export class TypeCollector implements ITypeCollector {
    */
   private inferObjectType(node: t.ObjectExpression): InferredType {
     if (node.properties.length === 0) {
-      return { typeName: 'object', confidence: 0.8 };
+      return { typeName: '{}', confidence: 1.0 };
     }
 
     // Track property types for destructuring
     const properties: { [key: string]: InferredType } = {};
+    const propertyTypeStrings: string[] = [];
     let hasProperties = false;
 
     for (const prop of node.properties) {
@@ -548,18 +549,29 @@ export class TypeCollector implements ITypeCollector {
         // Infer property value type
         if (propertyName && t.isExpression(prop.value)) {
           const valueType = this.inferTypeFromNode(prop.value);
-          if (valueType && valueType.confidence >= 0.7) {
+          if (valueType) {
             properties[propertyName] = valueType;
+
+            // Build property type string for shape type
+            // Use the inferred type name (which may itself be a shape for nested objects)
+            propertyTypeStrings.push(`${propertyName}: ${valueType.typeName}`);
             hasProperties = true;
           }
         }
+      } else if (t.isSpreadElement(prop)) {
+        // Spread elements prevent us from knowing the exact shape
+        // Fall back to generic object type
+        return { typeName: 'object', confidence: 0.8, properties };
       }
     }
 
     if (hasProperties) {
+      // Build a shape type like: { name: string, age: number }
+      const shapeType = `{ ${propertyTypeStrings.join(', ')} }`;
+
       return {
-        typeName: 'object',
-        confidence: 0.9,
+        typeName: shapeType,
+        confidence: 1.0, // Object literals have exact known types
         properties
       };
     }
