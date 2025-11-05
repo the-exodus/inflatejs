@@ -1,575 +1,91 @@
 # TODO: Type Inference Improvements
 
-This document lists JavaScript/TypeScript constructs that are not currently handled by the type inference system, organized by priority. Each section includes examples that can be used to create tests.
+This document lists JavaScript/TypeScript constructs that are not yet handled by the type inference system. Each section includes examples that can be used to create tests.
 
-## Test Quality Verification (Last Updated: Current Session)
+**For completed features, see [DONE.md](./DONE.md).**
 
-All tests have been verified to follow the 5-point testing strategy (CLAUDE.md):
+## Current Status
+
+**Tests**: 751 passing, 2 skipped (out of 753 total)
+**Coverage**: ~67% statements, ~58% branches, ~77% functions
+
+**Completed Phases**:
+- ✅ Phase 1: Foundation (4/4 items, 75 tests)
+- ✅ Phase 2: Common Patterns (6/6 items, 144 tests)
+- ✅ Phase 3: Modern JavaScript (4/4 items, 124 tests)
+- ✅ Phase 4: Advanced Features (5.5/6 items, 171 tests)
+
+**See [DONE.md](./DONE.md) for full details on completed features.**
+
+---
+
+## Test Quality Requirements
+
+All tests MUST follow the 5-point testing strategy (see CLAUDE.md):
 1. ✅ **Minimal test cases** - Constructs tested in isolation
 2. ✅ **Realistic test cases** - Constructs tested in real-world scenarios
 3. ✅ **Edge cases** - Nested, combined, boundary conditions
 4. ✅ **TypeScript compilation** - Generated code compiles without errors
 5. ✅ **Confidence scores** - Type inference confidence is reasonable (≥0.7)
 
-**Recent Updates**:
-- Unskipped 3 tests that now pass (2 callback inference + 1 destructuring with defaults)
-- **Implemented optional property inference**: Object literals destructured with default values for missing properties now get those properties added as optional (e.g., `{ x: number, y?: number }`)
-- Updated 4 outdated TODO comments to reflect completed features
-- Verified all 751 passing tests check actual type inference, not just syntax
-- All 2 skipped tests are properly documented with clear explanations (both reduce return type inference)
-- All test suites verified to follow CLAUDE.md test quality requirements
+**CRITICAL**: Tests must verify what they claim to test. Always check for actual type annotations, not just syntax preservation. See CLAUDE.md "Test Quality Requirements" section for detailed guidelines.
 
-## Priority 1: Critical (High Impact, Quick Wins)
+---
 
-### 1. Template Literals ✅ COMPLETED
-**Impact**: Very High (used in ~30% of modern JS)
-**Effort**: Low (5 minutes)
+## Remaining Features
 
-~~Currently returns `any`, should return `string`.~~
-**Status**: Implemented and tested (8 tests passing)
+### Priority 1: High Impact Features
 
-**Examples for tests:**
+#### 1. Reduce Return Type Inference ⏭️ BLOCKED (2 tests skipped)
+**Impact**: Medium (improves callback inference completeness)
+**Effort**: Medium (1-2 hours)
+**Blocks**: Full callback type inference completion
+
+Currently `reduce` is hardcoded to return `any` in known-types.ts. Need to infer return type from initial value argument.
+
+**Examples that need implementation:**
 ```javascript
-// Simple template literal
-const name = "John";
-const greeting = `Hello, ${name}!`;
-// Expected: greeting: string
+const numbers = [1, 2, 3];
 
-// Template literal with expressions
-const x = 5;
-const message = `Result: ${x * 2}`;
-// Expected: message: string
-
-// Nested template literals
-const outer = `Outer ${`inner ${42}`}`;
-// Expected: outer: string
-```
-
-### 2. Unary Expressions ✅ COMPLETED
-**Impact**: High (logical negation, typeof)
-**Effort**: Low (10 minutes)
-
-~~Currently returns `any` for `!`, `typeof`, `-`, `+`, `~`, `void`, `delete`.~~
-**Status**: Implemented and tested (18 tests passing)
-
-**Examples for tests:**
-```javascript
-// Logical NOT
-const isActive = true;
-const isInactive = !isActive;
-// Expected: isInactive: boolean
-
-// typeof operator
-const typeOfValue = typeof 42;
-// Expected: typeOfValue: string
-
-// Unary plus/minus
-const num = 5;
-const negative = -num;
-const positive = +num;
-// Expected: negative: number, positive: number
-
-// void operator
-const result = void 0;
-// Expected: result: undefined
-```
-
-### 3. Conditional (Ternary) Expressions ✅ COMPLETED
-**Impact**: High (common pattern)
-**Effort**: Medium (20 minutes)
-
-~~Currently returns `any`, should infer union type or common type.~~
-**Status**: Implemented and tested (14 tests passing)
-
-**Examples for tests:**
-```javascript
-// Same type branches
-const mode = isDev ? "debug" : "production";
-// Expected: mode: string
-
-// Number branches
-const value = condition ? 100 : 200;
-// Expected: value: number
-
-// Different types (union)
-const result = flag ? "text" : 42;
-// Expected: result: string | number (or 'any' as fallback)
-
-// Nested ternary
-const level = score > 90 ? "A" : score > 80 ? "B" : "C";
-// Expected: level: string
-```
-
-### 4. Logical Expressions (Value Usage) ✅ COMPLETED
-**Impact**: High (common for defaults)
-**Effort**: Medium (20 minutes)
-
-~~`||` and `&&` used for values, not just booleans.~~
-**Status**: Implemented and tested (30 tests passing)
-
-**Implementation notes**:
-- Supports `||`, `&&`, and `??` operators
-- Infers common type when both operands have the same type
-- Returns `any` with low confidence when operand types differ
-- Known limitation: Identifier resolution during initial collection may result in lower confidence scores for expressions referencing variables
-
-**Examples for tests:**
-```javascript
-// OR for default values
-const name = userName || "Anonymous";
-// Expected: name should match userName's type or fallback type
-
-// AND for conditional values
-const result = isReady && fetchData();
-// Expected: depends on fetchData() return type
-
-// Nullish coalescing (if supported)
-const value = input ?? defaultValue;
-// Expected: matches input type
-```
-
-### 5. Common Array Methods ✅ COMPLETED
-**Impact**: High (very common)
-**Effort**: Low (15 minutes - just add to known-types)
-
-~~Missing: `reduce`, `find`, `findIndex`, `some`, `every`, `forEach`, `flat`, `flatMap`, `slice`, `concat`, `push`, `pop`, `shift`, `unshift`~~
-**Status**: Implemented and tested (13 array method tests passing)
-
-**Examples for tests:**
-```javascript
-const numbers = [1, 2, 3, 4, 5];
-
-// reduce
+// Reduce with numeric initial value
 const sum = numbers.reduce((acc, n) => acc + n, 0);
-// Expected: sum: number
+// Current: sum: any
+// Expected: sum: number (from initial value)
 
-// find
-const found = numbers.find(n => n > 3);
-// Expected: found: number | undefined
+// Reduce with object initial value
+const obj = numbers.reduce((acc, n) => ({...acc, [n]: n * 2}), {});
+// Current: obj: any
+// Expected: obj: object (from initial value)
 
-// some/every
-const hasEven = numbers.some(n => n % 2 === 0);
-const allPositive = numbers.every(n => n > 0);
-// Expected: hasEven: boolean, allPositive: boolean
+// Reduce with string initial value
+const str = ["a", "b", "c"].reduce((acc, s) => acc + s, "");
+// Current: str: any
+// Expected: str: string (from initial value)
 
-// flat
-const nested = [[1, 2], [3, 4]];
-const flattened = nested.flat();
-// Expected: flattened: number[]
+// Reduce with array initial value
+const flat = [[1, 2], [3, 4]].reduce((acc, arr) => acc.concat(arr), []);
+// Current: flat: any
+// Expected: flat: any[] or number[] (from initial value)
 
-// slice
-const sliced = numbers.slice(1, 3);
-// Expected: sliced: number[]
+// Reduce without initial value (return type from array element type)
+const product = [1, 2, 3].reduce((acc, n) => acc * n);
+// Current: product: any
+// Expected: product: number (from array element type)
 ```
 
-### 6. Common String Methods ✅ COMPLETED
-**Impact**: High (very common)
-**Effort**: Low (10 minutes - just add to known-types)
+**Implementation approach**:
+1. Make known-types context-aware to accept CallExpression node
+2. For `reduce`, inspect second argument (initial value) to infer return type
+3. If no initial value, return array element type
+4. Handle edge cases (empty arrays, no initial value = error)
 
-~~Missing: `slice`, `replace`, `replaceAll`, `trim`, `trimStart`, `trimEnd`, `toLowerCase`, `toUpperCase`, `startsWith`, `endsWith`, `includes`, `match`, `test`, `padStart`, `padEnd`, `repeat`~~
-**Status**: Implemented and tested (22 string method tests passing)
+**Related tests**: 2 skipped tests in `src/__tests__/callback-inference.test.ts`
 
-**Examples for tests:**
-```javascript
-const text = "Hello World";
+---
 
-// slice
-const sliced = text.slice(0, 5);
-// Expected: sliced: string
+### Priority 2: Important Features
 
-// replace
-const replaced = text.replace("World", "Universe");
-// Expected: replaced: string
-
-// trim
-const trimmed = text.trim();
-// Expected: trimmed: string
-
-// toLowerCase/toUpperCase
-const lower = text.toLowerCase();
-const upper = text.toUpperCase();
-// Expected: lower: string, upper: string
-
-// startsWith/endsWith/includes
-const starts = text.startsWith("Hello");
-const ends = text.endsWith("World");
-const contains = text.includes("o");
-// Expected: all boolean
-
-// match
-const matches = text.match(/[A-Z]/g);
-// Expected: matches: RegExpMatchArray | null (or string[] | null)
-
-// repeat
-const repeated = "x".repeat(3);
-// Expected: repeated: string
-```
-
-## Priority 2: Important (Medium Impact)
-
-### 7. Destructuring ✅ COMPLETED
-**Impact**: Medium-High (ES6+ standard)
-**Effort**: High (2-3 hours - complex AST handling)
-
-**Status**: Implemented and tested (31 tests passing)
-
-**Implementation**:
-- **Parameter destructuring**: Pattern-level type annotations for function parameters
-  - Function declarations: `function greet({name, age}: {name: any, age: any})`
-  - Arrow functions: Handled via function type signatures
-  - Object and array patterns
-  - Rest elements in parameters (`{first, ...rest}`)
-
-- **Variable declaration destructuring**: Works with object literal shape types (item #7b)
-  - Object destructuring: `const {name, age} = user;` where user has shape type
-  - Array destructuring: `const [x, y] = coords;`
-  - Nested destructuring: `const {user: {name}} = data;`
-  - Rest elements: `const {a, ...rest} = obj;`
-
-**Key Features**:
-- Object destructuring validates against source object shape types
-- Array destructuring preserves array element types in pattern
-- Nested patterns work recursively
-- Default values preserved in output ✅
-- **Optional property inference**: Object literals destructured with default values for missing properties automatically get those properties added as optional ✅
-  - Example: `const obj = {x: 1}; const {x, y = 2} = obj;` → `obj: { x: number, y?: number }`
-  - This allows TypeScript compilation while preserving type safety
-- Rest elements handled correctly
-
-**Known Limitations**:
-- ~~Destructured variable type propagation not yet implemented (item #7c - follow-up feature)~~ ✅ FIXED
-  - ~~Variables get `any` type instead of inheriting from source~~
-  - ~~Example: `const {name} = user;` → `name` gets `any`, should get `string`~~
-  - ~~This is a separate feature requiring additional type flow analysis~~
-
-**Tests Created**: 42 total (31 feature + 10 TypeScript compilation + 5 confidence score)
-  - Note: Originally had 6 compilation tests, added 4 more that were skipped pending #7b/#7c
-**Tests Passing**: 46/46 ✅ (ALL PASSING!)
-  - 31 feature tests (all patterns, edge cases, realistic scenarios)
-  - 10 TypeScript compilation tests (1 previously skipped now passing!)
-  - 5 confidence score tests
-**Tests Skipped**: 0/46 ✅ (None! All tests passing!)
-
-Object and array destructuring in variable declarations and function parameters.
-
-**Examples for tests:**
-```javascript
-// Object destructuring
-const user = { name: "John", age: 30 };
-const { name, age } = user;
-// Expected: name: string, age: number (if user type known)
-
-// Array destructuring
-const coords = [10, 20];
-const [x, y] = coords;
-// Expected: x: number, y: number (if coords type known)
-
-// Nested destructuring
-const data = { user: { name: "John" } };
-const { user: { name: userName } } = data;
-// Expected: userName: string
-
-// Parameter destructuring
-function greet({ name, age }) {
-  return `${name} is ${age}`;
-}
-// Expected: name: any, age: any (or infer from usage)
-
-// Array destructuring with rest
-const [first, ...rest] = [1, 2, 3, 4];
-// Expected: first: number, rest: number[]
-```
-
-### 7b. Object Literal Shape Types ✅ COMPLETED
-**Impact**: High (required for destructuring variable declarations to work properly)
-**Effort**: High (2-3 hours - requires significant refactoring)
-
-**Status**: Implemented and tested (20 tests passing)
-
-**Implementation**:
-- Modified TypeCollector.inferObjectType() to build shape type strings like `{ name: string, age: number }`
-- Object literals now get specific shapes with confidence 1.0 (exact known types)
-- Handles nested objects recursively
-- Empty objects typed as `{}` instead of generic `object`
-- Objects with spread elements fall back to generic `object` (shape unknown)
-
-**What Changed**:
-Before: `const user = { name: "John", age: 30 };` → `user: object`
-After: `const user = { name: "John", age: 30 };` → `user: { name: string, age: number }`
-
-**Examples**:
-```javascript
-// Simple object
-const user = { name: "John", age: 30 };
-// Result: user: { name: string, age: number }
-
-// Nested object
-const data = { user: { name: "John" }, count: 5 };
-// Result: data: { user: { name: string }, count: number }
-
-// Mixed types
-const config = { port: 3000, host: "localhost", debug: true };
-// Result: config: { port: number, host: string, debug: boolean }
-
-// Object with arrays
-const state = { items: [1, 2, 3], active: true };
-// Result: state: { items: number[], active: boolean }
-```
-
-**Tests Created**: 20 tests in object-literal-shapes.test.ts
-**Tests Passing**: 20/20 ✅
-- Basic object literals (string, number, boolean properties)
-- Nested objects
-- Objects with arrays
-- Edge cases (empty objects, null values)
-- Integration with destructuring
-
-**Side Effects**:
-Updated 14 existing tests that expected generic `object` to now expect specific shapes:
-- class-features.test.ts (2 tests)
-- spread-operator.test.ts (3 tests)
-- default-parameters.test.ts (2 tests)
-- regexp-literals.test.ts (1 test)
-- union-types.test.ts (1 test)
-
-This is an improvement - the implementation is more precise than before!
-
-### 7c. Destructured Variable Type Propagation ✅ COMPLETED
-**Impact**: Medium (improves type accuracy for destructured variables)
-**Effort**: Low (15 minutes - simple one-line fix!)
-
-**Status**: Implemented and tested (5 tests re-enabled and passing)
-
-**Implementation**:
-Fixed a single line in TypeCollector.handleObjectPattern():
-- **Before**: `if (sourceType && sourceType.typeName === 'object' && sourceType.properties)`
-- **After**: `if (sourceType && sourceType.properties)`
-
-The issue was that the code was checking for `typeName === 'object'`, but with item #7b complete, object literals now have shape types like `{ name: string, age: number }` instead of generic `object`. The fix simply checks for the presence of the `properties` field, which works for both generic objects and shape types.
-
-**What Works**:
-```javascript
-// Object destructuring - variables inherit property types
-const user = { name: "John", age: 30 };  // user: { name: string, age: number }
-const {name, age} = user;                 // name: string, age: number ✅
-
-// Array destructuring - variables inherit element type
-const coords = [10, 20];                  // coords: number[]
-const [x, y] = coords;                    // x: number, y: number ✅
-
-// Nested destructuring - types preserved through nesting
-const data = { user: { name: "John" } };
-const {user: {name}} = data;              // name: string ✅
-
-// With default values - uses default type if property missing
-const obj = { x: 1 };
-const {x, y = 2} = obj;                   // x: number, y: number ✅
-
-// With rest - rest gets object/array type
-const arr = [1, 2, 3];
-const [first, ...rest] = arr;             // first: number, rest: number[] ✅
-```
-
-**Tests Re-enabled**: 8 previously skipped tests
-- All 5 confidence score tests now passing (destructured vars have proper types with high confidence)
-- 3 TypeScript compilation tests now passing (object destructuring, nested destructuring, rest elements)
-- Total test count: **713 passing, 1 skipped**
-  - Only 1 test skipped: destructuring with default values (blocked on preserving defaults during AST transformation)
-
-### 8. Spread Operator ✅ COMPLETED
-**Impact**: Medium (common in modern code)
-**Effort**: Medium (1 hour)
-
-Spread in arrays, objects, and function calls.
-
-**Examples for tests:**
-```javascript
-// Array spread
-const arr1 = [1, 2, 3];
-const arr2 = [...arr1, 4, 5];
-// Expected: arr2: number[]
-
-// Object spread
-const obj1 = { x: 1, y: 2 };
-const obj2 = { ...obj1, z: 3 };
-// Expected: obj2: object
-
-// Function call spread
-const nums = [1, 2, 3];
-const max = Math.max(...nums);
-// Expected: max: number
-```
-
-### 9. Rest Parameters ✅ COMPLETED
-**Impact**: Medium
-**Effort**: Medium (1 hour)
-
-~~Functions with rest parameters.~~
-**Status**: Implemented and tested (27 tests passing)
-
-**Implementation notes**:
-- Added RestElement handling to TypeCollector for all function types
-- Added rest parameter type annotation support in UnminificationPipeline for:
-  - Function declarations
-  - Arrow functions
-  - Function expressions
-  - Class methods and constructors
-- TypeResolver updated to handle RestElement in parameter type mapping
-- Rest parameters correctly typed as `...paramName: any[]`
-- Supports rest with regular parameters, default parameters, and in all function contexts
-
-**Examples for tests:**
-```javascript
-// Rest parameters
-function sum(...numbers) {
-  return numbers.reduce((a, b) => a + b, 0);
-}
-// Expected: sum: (...args: any[]) => number
-
-// Rest with typed parameters
-function log(message, ...args) {
-  console.log(message, args);
-}
-// Expected: log: (any, ...any[]) => void
-```
-
-### 10. Default Parameters ✅ COMPLETED
-**Impact**: Medium
-**Effort**: Low-Medium (30 minutes)
-
-~~Function parameters with default values.~~
-**Status**: Implemented and tested (33 tests passing)
-
-**Implementation notes**:
-- Added AssignmentPattern handling to TypeCollector for all function types
-- Added parameter type annotation support in UnminificationPipeline for:
-  - Function declarations
-  - Arrow functions
-  - Function expressions
-  - Class methods and constructors
-- Added BinaryExpression type inference for defaults like `y = 5 + 10`
-- Added MemberExpression type inference for defaults like `count = str.length`
-- Added Date.now() to knownTypes
-- TypeResolver updated to handle AssignmentPattern in parameter type mapping
-- Supports all primitive types, arrays, objects, expressions, and edge cases
-
-**Examples for tests:**
-```javascript
-// Default parameter with literal
-function greet(name = "Guest") {
-  return `Hello, ${name}`;
-}
-// Expected: greet: (string?) => string
-
-// Default parameter with expression
-function increment(x, delta = 1) {
-  return x + delta;
-}
-// Expected: increment: (any, number?) => number
-```
-
-### 11. RegExp Literals ✅ COMPLETED
-**Impact**: Medium
-**Effort**: Low (5 minutes)
-
-~~Regular expression literals should be typed as `RegExp`.~~
-**Status**: Implemented and tested (28 tests passing)
-
-**Implementation notes**:
-- Added RegExpLiteral support to both TypeCollector and TypeResolver
-- Added RegExp method inference: `test()` returns `boolean`
-- Supports all RegExp patterns, flags, and edge cases
-- Works correctly in ternary expressions, logical expressions, arrays, and type propagation
-
-**Examples for tests:**
-```javascript
-const pattern = /\d+/g;
-// Expected: pattern: RegExp
-
-const emailRegex = /^[a-z]+@[a-z]+\.[a-z]+$/i;
-// Expected: emailRegex: RegExp
-```
-
-### 12. Object Static Methods ✅ COMPLETED
-**Impact**: Medium (common utilities)
-**Effort**: Low (10 minutes - add to known-types)
-
-~~`Object.keys()`, `Object.values()`, `Object.entries()`, etc.~~
-**Status**: Implemented and tested (13 tests passing)
-
-**Implementation notes**:
-- Added to knownTypes map: Object.keys, Object.values, Object.entries, Object.assign, Object.create, Object.freeze, Object.seal
-- Enhanced TypeCollector and TypeResolver to handle static method calls (MemberExpression with object.method pattern)
-- All Object static methods now correctly inferred
-
-**Examples for tests:**
-```javascript
-const obj = { x: 1, y: 2, z: 3 };
-
-const keys = Object.keys(obj);
-// Expected: keys: string[]
-
-const values = Object.values(obj);
-// Expected: values: any[] (or number[] if obj type known)
-
-const entries = Object.entries(obj);
-// Expected: entries: [string, any][] (or [string, number][] if obj type known)
-
-const assigned = Object.assign({}, obj, { w: 4 });
-// Expected: assigned: object
-```
-
-### 13. Array Static Methods ✅ COMPLETED
-**Impact**: Medium
-**Effort**: Low (5 minutes - add to known-types)
-
-~~`Array.isArray()`, `Array.from()`, etc.~~
-**Status**: Implemented and tested (8 tests passing)
-
-**Implementation notes**:
-- Added to knownTypes map: Array.isArray, Array.from, Array.of
-- Works with same static method call handling as Object methods
-
-**Examples for tests:**
-```javascript
-const isArr = Array.isArray([1, 2, 3]);
-// Expected: isArr: boolean
-
-const arr = Array.from("hello");
-// Expected: arr: string[]
-
-const filled = Array(5).fill(0);
-// Expected: filled: number[]
-```
-
-### 14. Type Conversion Functions ✅ COMPLETED
-**Impact**: Medium
-**Effort**: Low (5 minutes - add to known-types)
-
-~~`parseInt()`, `parseFloat()`, `Number()`, `String()`, `Boolean()`~~
-**Status**: Implemented and tested (12 tests passing)
-
-**Implementation notes**:
-- Added to knownTypes map: parseInt, parseFloat
-- Number, String, Boolean were already in knownTypes
-- All type conversion functions now correctly inferred
-
-**Examples for tests:**
-```javascript
-const num = parseInt("42");
-// Expected: num: number
-
-const float = parseFloat("3.14");
-// Expected: float: number
-
-const str = String(123);
-// Expected: str: string
-
-const bool = Boolean(1);
-// Expected: bool: boolean
-```
-
-### 15. JSON Methods
+#### 2. JSON Methods
 **Impact**: Medium
 **Effort**: Low (5 minutes - add to known-types)
 
@@ -584,7 +100,9 @@ const stringified = JSON.stringify({ x: 1 });
 // Expected: stringified: string
 ```
 
-### 16. Promise Static Methods
+---
+
+#### 3. Promise Static Methods
 **Impact**: Medium
 **Effort**: Medium (30 minutes)
 
@@ -605,189 +123,17 @@ const race = Promise.race([p1, p2]);
 // Expected: race: Promise<number> (or Promise<any>)
 ```
 
-### 17. Union Type Inference ✅ COMPLETED
-**Impact**: High (improves type accuracy significantly)
-**Effort**: Medium (1-2 hours)
+---
 
-~~**Why needed**: Currently, when conditional expressions, logical expressions, or function return statements have different types, the system falls back to `any` with low confidence. Union types would preserve type information and improve accuracy.~~
-**Status**: Implemented and tested (22 tests passing)
+### Priority 3: Advanced Features
 
-**Current limitations addressed:**
-- Conditional expressions: `flag ? "text" : 42` → currently `any`, should be `string | number`
-- Logical expressions: `userInput || 0` → currently `any` if types differ, should be `string | number`
-- Function returns: Multiple return statements with different types → should infer union type
-
-**Solution approach**:
-1. Detect when types differ but both have high confidence (≥0.7)
-2. Create union type syntax: `type1 | type2`
-3. Handle simplification: `string | string` → `string`
-4. Handle nested unions: `(string | number) | boolean` → `string | number | boolean`
-5. Limit union complexity: max 3-4 types, otherwise fall back to `any`
-
-**Examples for tests:**
-```javascript
-// Conditional with different types
-const flag = true;
-const result = flag ? "success" : 404;
-// Expected: result: string | number
-
-const value = condition ? true : false;
-// Expected: value: boolean (simplified from boolean | boolean)
-
-// Logical OR with different types
-const input = getUserInput(); // returns string | undefined
-const value = input || 0;
-// Expected: value: string | number (from string | undefined | number)
-
-const port = process.env.PORT || 3000;
-// Expected: port: string | number
-
-// Logical AND with different types
-const flag = true;
-const result = flag && "done";
-// Expected: result: boolean | string
-
-// Function with multiple return types
-function getValue(flag) {
-  if (flag) {
-    return "text";
-  } else {
-    return 42;
-  }
-}
-// Expected: getValue: (any) => string | number
-
-function process(x) {
-  if (x > 0) return x;
-  if (x < 0) return "negative";
-  return null;
-}
-// Expected: process: (any) => number | string | null
-
-// Nested ternary with different types
-const level = score > 90 ? "A" : score > 70 ? "B" : 0;
-// Expected: level: string | number
-
-// Complex union simplification
-const a = flag1 ? "x" : "y";  // string
-const b = flag2 ? a : "z";     // string (all branches are string)
-// Expected: b: string
-
-const c = flag3 ? "hello" : 123;  // string | number
-const d = flag4 ? c : true;        // string | number | boolean
-// Expected: d: string | number | boolean
-
-// Array element unions
-const mixed = flag ? [1, 2, 3] : ["a", "b"];
-// Expected: mixed: number[] | string[]
-
-// Object union (if feasible)
-const obj = flag ? { x: 1 } : { y: "text" };
-// Expected: obj: object (union of object shapes is complex)
-
-// Union in type propagation
-const value = condition ? "text" : 42;
-const copied = value;
-// Expected: value: string | number, copied: string | number
-
-const doubled = value * 2; // Only works with number part
-// Note: This would require type narrowing, which is a separate feature
-```
-
-**Implementation notes:**
-- ✅ Modified `inferConditionalExpressionType` and `inferLogicalExpressionType` in both TypeCollector and TypeResolver to create union types
-- ✅ Added utility function `createUnionType(type1: InferredType, type2: InferredType): InferredType` to both classes
-- ✅ Implemented union type simplification (e.g., `string | string` → `string`) and deduplication
-- ✅ Implemented nested union flattening (e.g., `(string | number) | boolean` → `string | number | boolean`)
-- ✅ Confidence scoring: uses minimum confidence of constituent types * 0.9
-- ✅ Complexity limit: max 4 types in a union, otherwise falls back to `any`
-- ✅ Confidence threshold: both types must have confidence ≥ 0.7 to create union, otherwise falls back to `any`
-- ✅ Added support for `undefined` type inference (Identifier with name "undefined")
-- ✅ Fixed TypeScript type builder to handle union types before array types (prevents `(number[] | string)[]`)
-- Document that type narrowing (using unions correctly in operations) is a separate future enhancement
-
-**Related improvements this enables:**
-- Better function return type inference (item #30: Union Types from Conditionals)
-- More accurate logical expression types (item #4: already implemented, would be enhanced)
-- Improved conditional expression types (item #3: already implemented, would be enhanced)
-
-### 18. Context-Aware Method Inference (slice) ✅ COMPLETED
-**Impact**: Medium-High (very common method)
-**Effort**: Medium (1-2 hours)
-
-~~**Why needed**: The `slice()` method exists on both strings and arrays with different return types:
-- `string.slice()` → returns `string`
-- `array.slice()` → returns same array type (e.g., `number[]`)
-
-Currently, `slice()` is excluded from method inference because TypeCollector doesn't track object types during the initial inference pass, making it impossible to distinguish which `slice` is being called.~~
-
-~~**Solution approach**: Enhance TypeCollector to track object types during CallExpression inference, allowing it to determine the correct return type based on the callee's object type.~~
-
-**Status**: Implemented and tested (31 tests passing)
-
-**Examples for tests:**
-```javascript
-// String slice
-const text = "hello world";
-const sliced = text.slice(0, 5);
-// Expected: sliced: string
-
-const text2 = "hello";
-const sub1 = text2.slice(1);
-const sub2 = text2.slice(1, 4);
-// Expected: sub1: string, sub2: string
-
-// Array slice
-const numbers = [1, 2, 3, 4, 5];
-const sliced = numbers.slice(1, 3);
-// Expected: sliced: number[]
-
-const strings = ["a", "b", "c"];
-const partial = strings.slice(0, 2);
-// Expected: partial: string[]
-
-// In ternary expressions (this was the original bug)
-const flag = true;
-const arr = [1, 2, 3];
-const result = flag ? arr.slice(0, 2) : [4, 5];
-// Expected: result: number[]
-
-const text = "hello";
-const result2 = flag ? text.slice(0, 2) : "world";
-// Expected: result2: string
-```
-
-**Implementation notes:**
-- ✅ Enhanced TypeResolver's `inferCallType` to handle instance method calls context-aware
-- ✅ Added recursive type inference for chained method calls (e.g., `arr.slice().filter()`)
-- ✅ Modified `propagateTypes` to recursively infer types for complex call expressions
-- ✅ Added `propagateTypes` call to TypeResolver's `resolveTypes` iteration loop
-- ✅ TypeCollector returns moderate confidence (0.6) for `slice()` and `concat()` to allow TypeResolver to refine
-- ✅ Handles `slice()`, `concat()`, and all array methods returning same type (`map`, `filter`, etc.)
-- ✅ Works correctly in chained calls, ternary expressions, and logical expressions
-- ✅ Comprehensive test coverage with 31 tests including edge cases
-
-## Priority 3: Advanced (Lower Impact or Complex)
-
-### 19. Optional Chaining ✅ COMPLETED
-**Impact**: Medium (ES2020 feature)
-**Effort**: High (2 hours - needs careful null handling)
-
-**Examples for tests:**
-```javascript
-const user = { profile: { name: "John" } };
-const name = user?.profile?.name;
-// Expected: name: string | undefined
-
-const result = obj?.method?.();
-// Expected: result depends on method return type or undefined
-```
-
-### 20. Nullish Coalescing
+#### 4. Nullish Coalescing Enhancement
 **Impact**: Low-Medium (ES2020 feature)
 **Effort**: Low (10 minutes)
 
-**Examples for tests:**
+**Note**: Nullish coalescing (`??`) already works via logical expression support (item #4 in DONE.md). This item is for potential enhancements or edge cases.
+
+**Examples for verification:**
 ```javascript
 const value = input ?? "default";
 // Expected: value matches input type or fallback type
@@ -796,85 +142,9 @@ const port = process.env.PORT ?? 3000;
 // Expected: port: string | number (union type)
 ```
 
-### 21. Class Features ✅ COMPLETED
-**Impact**: Medium
-**Effort**: High (3-4 hours)
+---
 
-~~Class inheritance, static methods, getters/setters, private fields.~~
-**Status**: Implemented and tested (38 class feature tests + 7 TypeScript compilation tests + 5 confidence score tests passing)
-
-**Implementation notes:**
-- ✅ Class method return type inference from return statements
-- ✅ Static method return types (same as regular methods)
-- ✅ Getter return type inference
-- ✅ Setter parameter types
-- ✅ Class inheritance (extends keyword preserved)
-- ✅ Constructor parameter types (including default and rest parameters)
-- ✅ Class property declarations from constructor assignments
-- ✅ Class expressions (named and anonymous)
-- ✅ Methods with default parameters, rest parameters, and mixed types
-- ✅ Method return types: literals, objects, arrays, boolean, void, union types
-- ✅ Binary and logical expression handling in methods
-- ⚠️ Known limitation: Getters returning `this.property` have low confidence without property tracking (see item #32)
-- ⚠️ Known limitation: Methods with complex callback inference (like `reduce`) may have lower confidence (see item #27)
-
-**Examples for tests:**
-```javascript
-// Basic class
-class Point {
-  x: number;
-  y: number;
-
-  constructor(x, y) {
-    this.x = x;
-    this.y = y;
-  }
-
-  distance(): number {
-    return Math.sqrt(this.x ** 2 + this.y ** 2);
-  }
-}
-// ✅ Implemented: Point type, distance: () => number
-
-// Class inheritance
-class Point3D extends Point {
-  z: number;
-
-  constructor(x, y, z) {
-    super(x, y);
-    this.z = z;
-  }
-}
-// ✅ Implemented: Point3D extends Point
-
-// Static methods
-class MathUtils {
-  static add(a: any, b: any): number {
-    return a + b;
-  }
-}
-// ✅ Implemented: MathUtils.add: (any, any) => number
-
-// Getters and setters
-class Counter {
-  _count: any;
-
-  constructor() {
-    this._count = 0;
-  }
-
-  get count(): number {
-    return this._count;  // Known limitation: returns any without property tracking
-  }
-
-  set count(v: any) {
-    this._count = v;
-  }
-}
-// ✅ Implemented: Getter return types (with limitations), setter parameter types
-```
-
-### 22. Generator Functions
+#### 5. Generator Functions
 **Impact**: Low (specialized use)
 **Effort**: High (2 hours)
 
@@ -892,7 +162,9 @@ const first = gen.next();
 // Expected: first: IteratorResult<number>
 ```
 
-### 23. Async Iterators
+---
+
+#### 6. Async Iterators
 **Impact**: Low (advanced feature)
 **Effort**: High (2 hours)
 
@@ -905,7 +177,9 @@ async function* asyncGenerator() {
 // Expected: asyncGenerator: () => AsyncGenerator<number>
 ```
 
-### 24. Symbol and BigInt
+---
+
+#### 7. Symbol and BigInt
 **Impact**: Low (rarely used in minified code)
 **Effort**: Low (5 minutes)
 
@@ -921,7 +195,9 @@ const computed = BigInt(100);
 // Expected: computed: bigint
 ```
 
-### 25. Computed Property Names
+---
+
+#### 8. Computed Property Names
 **Impact**: Low
 **Effort**: Medium (1 hour)
 
@@ -935,7 +211,9 @@ const obj = {
 // Expected: obj: object (limited inference possible)
 ```
 
-### 26. Type Narrowing
+---
+
+#### 9. Type Narrowing
 **Impact**: Medium (important for accuracy)
 **Effort**: Very High (4+ hours - requires control flow analysis)
 
@@ -953,97 +231,9 @@ function process(value) {
 }
 ```
 
-### 27. Callback Type Inference ✅ NEARLY COMPLETE
-**Impact**: High (very useful)
-**Effort**: Very High (4+ hours - requires sophisticated analysis)
+---
 
-~~Infer parameter types in callbacks from array element types.~~
-
-**Status**: Fully implemented for all array methods! Callback parameters AND return types work comprehensively.
-
-**What works:**
-- ✅ Callback parameter type inference from array element types
-- ✅ Callback return type inference for map/flatMap methods
-- ✅ Handles simple callbacks: `x => x * 2`
-- ✅ Handles complex expressions: `w => w.length`
-- ✅ Handles block statements with return
-- ✅ Works with chained methods: `nums.map(...).filter(...).map(...)`
-- ✅ Scope-aware parameter renaming (fixes multiple params with same original name)
-- ✅ Object property access in callbacks: `users.map(u => u.name)` correctly infers `string[]`
-- ✅ Empty array callbacks properly fallback to `any`: `[].map(x => x * 2)` → `(param: any)`
-- ✅ Untyped function parameters: `function(arr) { arr.map(x => ...) }` → `(param: any)`
-- ✅ Empty object literal typed as `object` instead of `{}`
-- ✅ 25/27 tests passing (93%), 2 skipped
-
-**Implementation notes:**
-- ✅ Enhanced TypeCollector to infer callback parameter types via `inferCallbackContext()` and `inferCallbackParameterType()`
-- ✅ Enhanced TypeResolver to infer callback return types via `inferCallbackReturnType()`
-- ✅ Modified `inferMethodReturnType()` to accept `callNode` and `typeMap` for context
-- ✅ Implemented scope-aware typeMap updates in UnminificationPipeline to handle parameter renaming
-- ✅ Lowered variable annotation confidence threshold from 0.7 to 0.5 to support chained method calls
-- ✅ Each method in a chain applies 0.9 confidence penalty, so 3 chained methods = 0.729 confidence
-- ✅ Fixed object property access by preserving `properties` field through array type creation and callback context extraction
-- ✅ Fixed empty/untyped array callbacks by boosting `any` confidence to 0.95 to prevent usage-based override
-- ✅ Fixed function parameter callbacks by checking for `any` type with confidence 0 (untyped parameters)
-- ✅ Changed empty object literal inference from `{}` to `object` for better type consistency
-
-**Remaining limitation (2 tests skipped):**
-- ⏭️ **Reduce return type inference** - `reduce` result variables not typed
-  - Currently `reduce` is hardcoded to return `any` in known-types.ts
-  - To implement: Make known-types context-aware to infer reduce return type from initial value argument
-  - Enhancement for future: Context-aware method return type system
-  - Tests skipped with clear TODO comments explaining the limitation
-
-**Examples that now work:**
-```javascript
-const numbers = [1, 2, 3, 4, 5];
-
-// Callback parameter AND return type inferred
-const doubled = numbers.map(x => x * 2);
-// Output: (param: number) => ... doubled: number[]
-
-const filtered = numbers.filter(x => x > 2);
-// Output: (param: number) => ... filtered: number[]
-
-// String array with property access
-const words = ["hello", "world"];
-const lengths = words.map(word => word.length);
-// Output: (param: string) => ... lengths: number[]
-
-// Chained methods
-const result = nums.map(x => x * 2).filter(x => x > 5).map(x => x + 1);
-// Output: All callbacks typed correctly, result: number[]
-```
-
-### 28. Chained Method Calls ✅ COMPLETED
-**Impact**: High (common pattern)
-**Effort**: Medium (current system should handle, may need fixes)
-
-~~**Examples for tests:**~~
-~~```javascript
-const result = "hello,world,test"
-  .split(",")
-  .map(s => s.toUpperCase())
-  .filter(s => s.length > 5)
-  .join("-");
-// Expected: result: string
-// Each step: split->string[], map->string[], filter->string[], join->string
-```~~
-
-**Status**: Implemented and tested (26 tests passing)
-
-**Implementation notes:**
-- ✅ Implemented as part of context-aware method inference (item 10/18)
-- ✅ Recursive type inference through `inferCallType` in TypeResolver
-- ✅ Handles chains of any length (tested up to 7 methods)
-- ✅ Works with string methods: `split()->map()->filter()->join()`
-- ✅ Works with array methods: `slice()->filter()->map()->reverse()`
-- ✅ Works in expressions: ternary, logical OR/AND
-- ✅ Handles mixed chains: string to array and back
-- ✅ Real-world examples: CSV parsing, data pipelines, URL processing
-- ✅ Note: Callback parameter inference (item 27) is a separate advanced feature
-
-### 29. IndexedAccess / Computed Member Access
+#### 10. IndexedAccess / Computed Member Access
 **Impact**: Medium
 **Effort**: Medium (1 hour)
 
@@ -1059,7 +249,9 @@ const value = obj[key];
 // Expected: value: any (dynamic access is hard to type)
 ```
 
-### 30. this Context
+---
+
+#### 11. this Context
 **Impact**: Medium
 **Effort**: High (2-3 hours)
 
@@ -1074,7 +266,9 @@ const obj = {
 // Expected: getValue should recognize this.value as number
 ```
 
-### 31. Closures with Captured Variables
+---
+
+#### 12. Closures with Captured Variables
 **Impact**: Medium
 **Effort**: Medium (current system might handle, may need verification)
 
@@ -1092,13 +286,15 @@ const value = counter();
 // Expected: value: number (if count type is tracked)
 ```
 
-### 32. Class Property Tracking
+---
+
+#### 13. Class Property Tracking
 **Impact**: Medium-High (significantly improves class feature inference)
 **Effort**: Very High (3-4 hours - requires architectural changes)
 
-**Why needed**: Currently, getters and methods that return `this.property` cannot infer accurate types because property types are not tracked across the class scope. This limits the usefulness of class feature inference (item #21).
+**Why needed**: Currently, getters and methods that return `this.property` cannot infer accurate types because property types are not tracked across the class scope. This limits the usefulness of class feature inference.
 
-**Dependencies**: Will be significantly helped by type narrowing (item #26) implementation, which provides control flow analysis that can track property assignments.
+**Dependencies**: Will be significantly helped by type narrowing (item #9) implementation, which provides control flow analysis that can track property assignments.
 
 **What's needed**:
 1. Class-level property type map to track property assignments
@@ -1200,60 +396,93 @@ class Optional {
    - Use control flow analysis to track property type changes
    - Support conditional narrowing (e.g., `if (this.value !== null)`)
 
-**Current limitations (from item #21):**
+**Current limitations**:
 - Getters returning `this.property` have low confidence
 - Methods returning `this.property` cannot infer accurate types
 - Property mutations not tracked across methods
 
-**Related items:**
-- Item #21 (Class Features) - Currently limited by lack of property tracking
-- Item #26 (Type Narrowing) - Will provide control flow analysis for property tracking
-- Item #30 (this Context) - Related to understanding `this.property` access
+**Related items**:
+- See DONE.md item #19 (Class Features) - Currently limited by lack of property tracking
+- Item #9 (Type Narrowing) - Will provide control flow analysis for property tracking
+- Item #11 (this Context) - Related to understanding `this.property` access
 
-### 33. Union Types from Conditionals
-**Impact**: Medium (improves accuracy)
-**Effort**: High (2 hours)
+---
 
-**Note**: This item is superseded by **Item #17: Union Type Inference**, which provides a more comprehensive solution for union types in conditionals, logical expressions, and function returns.
+## Implementation Priority Recommendations
 
-**Examples for tests:**
-```javascript
-function getValue(flag) {
-  if (flag) {
-    return "text";
-  } else {
-    return 42;
-  }
-}
-// Expected: getValue: (any) => string | number (or any as fallback)
-```
+### Next Recommended Items (Ordered by ROI)
 
-## Summary Statistics
+1. **Reduce Return Type Inference** (item #1) - Completes callback inference, unblocks 2 tests
+   - Medium effort, medium impact
+   - Direct improvement to existing feature
+   - Clear implementation path
 
-### By Priority
-- **Priority 1 (Critical)**: 6 items - Quick wins, high impact
-- **Priority 2 (Important)**: 13 items - Medium effort, good ROI
-- **Priority 3 (Advanced)**: 13 items - Complex or specialized
+2. **JSON Methods** (item #2) - Quick win, commonly used
+   - Low effort (5 minutes)
+   - Medium impact
+   - Just add to known-types
 
-### By Effort
-- **Low (< 30 min)**: 12 items
-- **Medium (30 min - 2 hours)**: 13 items
-- **High (2+ hours)**: 7 items
+3. **Symbol and BigInt** (item #7) - Quick win for completeness
+   - Low effort (5 minutes)
+   - Low impact but easy to add
+   - Just add to known-types
 
-### Quick Wins (< 1 hour total)
-Implementing Priority 1 items 1-6 would add support for:
-- Template literals
-- Unary expressions (!, typeof, etc.)
-- Ternary operators
-- Logical operators for values
-- ~40 missing array methods
-- ~20 missing string methods
+4. **Computed Property Names** (item #8) - Modern JavaScript support
+   - Medium effort (1 hour)
+   - Low-medium impact
+   - Improves object literal inference
 
-**Impact**: Would improve type inference coverage from ~50% to ~75%+ of common JavaScript code.
+5. **IndexedAccess / Computed Member Access** (item #10) - Common pattern
+   - Medium effort (1 hour)
+   - Medium impact
+   - Useful for array/object access
+
+### Advanced Items (Longer Term)
+
+6. **Promise Static Methods** (item #3) - Async support
+   - Medium effort (30 minutes)
+   - Medium impact
+   - Requires Promise type support
+
+7. **Closures with Captured Variables** (item #12) - Improve closure inference
+   - Medium effort (may already work)
+   - Medium impact
+   - May just need verification tests
+
+8. **Type Narrowing** (item #9) - High value but complex
+   - Very high effort (4+ hours)
+   - Medium impact (improves accuracy significantly)
+   - Requires control flow analysis
+   - Unlocks other features
+
+9. **Class Property Tracking** (item #13) - Improves class inference
+   - Very high effort (3-4 hours)
+   - Medium-high impact
+   - Depends on type narrowing
+   - Significantly improves class features
+
+10. **this Context** (item #11) - Related to class property tracking
+    - High effort (2-3 hours)
+    - Medium impact
+    - Works with class property tracking
+
+### Specialized Features (Lower Priority)
+
+11. **Generator Functions** (item #5) - Specialized use case
+    - High effort (2 hours)
+    - Low impact
+    - Rarely used in minified code
+
+12. **Async Iterators** (item #6) - Advanced feature
+    - High effort (2 hours)
+    - Low impact
+    - Very specialized
+
+---
 
 ## Testing Strategy
 
-For each TODO item:
+For each TODO item, when implemented:
 
 1. **Create a minimal test case** showing the construct in isolation
 2. **Create a realistic test case** showing the construct in context
@@ -1261,88 +490,28 @@ For each TODO item:
 4. **Verify TypeScript output** compiles without errors
 5. **Check confidence scores** are reasonable (≥0.7 for good inferences)
 
-## Implementation Order Recommendation
-
-### Phase 1 (1 hour): Foundation ✅ COMPLETED
-1. Template literals ✅
-2. Unary expressions ✅
-3. Ternary operators ✅
-4. Missing array/string methods in known-types ✅
-
-**Results**:
-- Added 75 new tests (all passing)
-- Total test count: 256 (up from 181)
-- Coverage improved from ~50% to ~75%+ of common JavaScript patterns
-
-### Phase 2 Progress ✅ COMPLETED
-- Item 5 (Logical expressions): Added 30 new tests (all passing) ✅
-- Item 6 (RegExp literals): Added 28 new tests (all passing) ✅
-- Item 7 (Object/Array static methods) + Item 8 (Type conversion): Added 33 new tests (all passing) ✅
-- Item 9 (Union type inference): Added 22 new tests (all passing) ✅
-- Item 10 (Context-aware method inference): Added 31 new tests (all passing) ✅
-- Total test count: 401 (up from 315)
-- **Phase 2 complete!** All common JavaScript patterns now have robust type inference.
-
-### Phase 2 (2-3 hours): Common Patterns ✅ COMPLETED
-5. Logical expressions for values ✅
-6. RegExp literals ✅
-7. Object/Array static methods ✅
-8. Type conversion functions ✅
-9. Union type inference ✅
-10. Context-aware method inference (slice) ✅
-
-### Phase 3 Progress
-- Item 11 (Default parameters): Added 33 new tests (all passing) ✅
-- Item 12 (Rest parameters): Added 27 new tests (all passing) ✅
-- Item 13 (Optional chaining): Added 29 new tests + 4 TypeScript compilation tests + 3 confidence score tests (all passing) ✅
-- Item 14 (Spread operator): Added 29 new tests + 6 TypeScript compilation tests + 5 confidence score tests (all passing) ✅
-- Total test count: 602 (up from 566)
-- **Phase 3: COMPLETE!** ✅ (4 of 4 items done)
-
-### Phase 3 (3 hours): Modern JavaScript ✅ COMPLETED
-11. Default parameters ✅
-12. Rest parameters ✅
-13. Optional chaining ✅
-14. Spread operator ✅
-
-### Phase 4 Progress
-- Item 16 (Class features): Added 50 new tests (38 feature + 7 compilation + 5 confidence), all passing ✅
-- Item 7b (Object Literal Shape Types): Added 20 new tests, all passing ✅
-  - Implemented object literal shape type inference in TypeCollector
-  - Updated 14 existing tests to expect specific shapes instead of generic `object`
-- Item 7c (Destructured Variable Type Propagation): Simple one-line fix ✅
-  - Re-enabled 8 previously skipped tests (5 confidence + 3 compilation), all now passing
-  - Destructured variables now inherit types from their source objects/arrays
-- Item 15 (Destructuring): All 42 tests passing ✅
-  - 31 feature tests (parameter + variable declaration destructuring)
-  - 9 TypeScript compilation tests (3 newly re-enabled!)
-  - 5 confidence score tests
-- Item 27 (Callback Type Inference): Added 27 feature tests + 2 compilation tests + 2 confidence tests (all passing except 2 skipped) ✅
-  - 17 feature tests (basic callbacks, realistic scenarios, edge cases, reduce/some/every/find/findIndex)
-  - 10 advanced tests (multi-parameter callbacks, nested callbacks, destructuring, chained methods)
-  - 6 TypeScript compilation tests (5 passing + 1 in earlier skipped tests section)
-  - 5 confidence score tests (4 passing + 1 in earlier skipped tests section)
-  - 2 tests unskipped: object array callback tests (compilation + confidence) - now passing!
-  - 2 tests skipped: reduce return type inference (requires context-aware method return types)
-  - Fixed object property access in callbacks, empty array fallback, untyped parameter handling
-- **Total test count: 753 (751 passing, 2 skipped)**
-  - 2 skipped: reduce return type inference (requires context-aware method return types)
-- **Phase 4: 5 of 6 items complete** (Class features ✅, Destructuring ✅, Object Literal Shape Types ✅, Destructured Variable Type Propagation ✅, Callback Type Inference ✅)
-
-### Phase 4 (6-7+ hours): Advanced Features
-15. Destructuring ✅
-7b. Object Literal Shape Types ✅
-7c. Destructured Variable Type Propagation ✅
-16. Class features ✅
-27. Callback type inference ✅
-18. Type narrowing
-
-### Phase 5 (3-4 hours): Type System Enhancements
-19. Class property tracking (item #32) - Depends on type narrowing
-    - Significantly improves class getter/method inference
-    - Tracks `this.property` assignments across class scope
-    - Integrates with type narrowing for conditional property types
+See CLAUDE.md for detailed test quality requirements and examples.
 
 ---
 
-**Note**: Each item includes examples that can be directly converted into test cases. The examples show both the input JavaScript and the expected inferred types in comments.
+## Summary Statistics
+
+### Remaining by Priority
+- **Priority 1 (High Impact)**: 1 item
+- **Priority 2 (Important)**: 2 items
+- **Priority 3 (Advanced)**: 10 items
+
+### Remaining by Effort
+- **Low (< 30 min)**: 3 items (JSON, Symbol/BigInt, Nullish coalescing check)
+- **Medium (30 min - 2 hours)**: 5 items (Reduce, Promise, Computed properties, IndexedAccess, Closures)
+- **High (2+ hours)**: 5 items (Generators, Async iterators, Type narrowing, this Context, Class property tracking)
+
+### Quick Wins Available
+Implementing items #1, #2, #7 would take ~1.5 hours and complete:
+- Reduce return type inference (completes callback inference)
+- JSON methods (parse, stringify)
+- Symbol and BigInt literals
+
+---
+
+**Note**: See [DONE.md](./DONE.md) for all completed features with examples and test results.
